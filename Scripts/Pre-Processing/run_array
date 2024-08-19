@@ -27,7 +27,6 @@ block=$7
 #====================================================================
 # Specify this script's parameters
 #====================================================================
-
 #(a) Determine the subject in the filelist 
 # You sum 1 to offset the zero-based indexing
 # SLURM_ARRAY_TASK_ID=1
@@ -41,7 +40,9 @@ scriptDir=${metaDir}/code
 logDir=${metaDir}/logs/run_freesurfer/${assessment}
 echo "${logDir}"
 
-#----- Checks:
+#====================================================================
+# Checks:
+#====================================================================
 # Check if logDir does not exist and create it if necessary
 if [ ! -d "$logDir" ]; then
   mkdir -p "$logDir"
