@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# This script runs freesurfer on HPC for subs with T1 and T2 or
+# T1 only if no T2 is present.
+# load modules
+#====================================================================
+. /etc/profile.d/modules.sh                # Leave this line (enables the module command)
+module purge                               # Removes all modules still loaded
+module load rhel8/default-icl              # if submitting to icelake
+module load freesurfer/7.1.0
+echo "this output is from inside run_freesurfer_conditional.sh"
+echo "script started at $(date)"
+#====================================================================
+# Read in parameters
+#====================================================================
+#1. subject
+subject=$1 
+
+#2. BIDS directory
+dataDir=$2
+
+#3. Wave and assessment
+assessment=$3
+
+#4. Arm
+arm=$4
+
+#5.MetaDir not used
+
+#====================================================================
+# change to overearching bids directory
+basedir=${dataDir}/${subject}
+surfdir=${basedir}/${assessment}/surfaces/
+tmpDIR=/home/bp520/rds/hpc-work/Pre-Processing/TempDir
+
+#====================================================================
+# Execute code
+#====================================================================
+# set up and make necessary subfolders
+mkdir -p ${surfdir}
+mkdir -p ${tmpDIR}
+
+export SUBJECTS_DIR=${surfdir}
+export TMPDIR=${tmpDIR}
+
+echo "submitting ${subject}"
+
+#Freesurfer submission: conditional on T1 and/or T2 presence
+    if [ -e ${basedir}/${assessment}/anat/${subject}_${arm}_run-01_T1w.nii ] && [ -e ${basedir}/${assessment}/anat/${subject}_${arm}_run-01_T2w.nii ]
+    then
+
+    #DIRECTIONS: if the files exist
+    #Print the path to the T1
+    #Print the path to the T2
+
+    echo 'Submitting both T1 and T2' ${subject}
+
+    # recon-all -subject ${subject} \
+    # -i ${basedir}/${assessment}/anat/${subject}_${arm}_run-01_T1w.nii \
+    # -T2 ${basedir}/${assessment}/anat/${subject}_${arm}_run-01_T2w.nii -T2pial -all -no-isrunning -threads 4
+    
+    elif [ -e ${basedir}/${assessment}/anat/${subject}_${arm}_run-01_T1w.nii ] && [ ! -e ${basedir}/${assessment}/anat/${subject}_${arm}_run-01_T2w.nii ]
+    then
+
+    echo 'Submitting only T1' ${subject}
+
+    # recon-all -subject ${subject} -i ${basedir}/${assessment}/anat/${subject}_${arm}_run-01_T1w.nii -all -no-isrunning -threads 4
+    #DIRECTIONS: if the files exist
+    #Print the path to the T1
+    #Print the path to the T2
+    fi
