@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# GOAL: Meta-submission of (1) run_freesurfer_batch and (2) abcd_parcellate_batch.
+# University of Cambridge 2023
+# Adapted by: Bess Pearson 
+
+#====================================================================
+# Specify parameters for each BATCH script.
+#====================================================================
+#1. List of subjects to iterate through
+sublist="/home/bp520/rds/hpc-work/Pre-Processing/lists/my_sub_list.txt"
+
+#2. BIDS directory - not tied to metaDir just in case.
+dataDir="/home/bp520/rds/hpc-work/Pre-Processing/raw_pcp" 
+
+#3. Wave and assessment
+assessment="ses-baseline-year1"
+
+#4. ARM // Ocassionally differently specified per wave
+arm="ses-baselineYear1Arm1"
+
+#5. Meta-directory: Where your logs & code are located
+metaDir="/home/bp520/rds/hpc-work/Pre-Processing"
+
+#6. How long is the length of subjects being considered?
+block_length=5
+
+#7.Block: segment of subjects we are working through
+block=1
+
+#====================================================================
+# PREP
+#====================================================================
+code_dir=${metaDir}/code
+echo $code_dir
+
+#Directory for the LOG of this meta-submission
+metaLog_DIR=${code_dir}/meta_logs/${assessment}/
+mkdir -p $metaLog_DIR
+
+#Directory for array logs to discard
+TEMP_log="${metaDir}/logs/Tmp"
+mkdir -p $TEMP_log
+
+#====================================================================
+#====================================================================
+########################### RUN SCRIPTS #############################
+#====================================================================
+#====================================================================
+
+
+#====================================================================
+# Execute freesurfer 
+#====================================================================
+#1.1. Meta log 
+metaLog=${metaLog_DIR}/submission_run_freesurfer_array_${assessment}.log
+
+echo "This is a run from $(date)" | tee -a ${metaLog}
+echo "****running FS batch script*******" | tee -a ${metaLog}
+ 
+sbatch --array=0-$((${block_length}-1)) --account=BETHLEHEM-SL3-CPU \
+             ${code_dir}/run_array.sh ${sublist} ${dataDir} ${assessment} ${arm} ${metaDir} ${block_length}   0 >> ${metaLog} 2>&1 
+             
+echo "****done with FS batch script*******" | tee -a ${metaLog}
+
+#====================================================================
+#To check if the recon-all commands in run_conditional.sh worked via just submitting meta_submission.sh
+#====================================================================
+# Directory containing log files
+log_dir="/home/bp520/rds/hpc-work/Pre-Processing/logs/run_freesurfer/ses-baseline-year1"
+
+# Loop through all log files in the directory
+for log_file in "$log_dir"/*.log; do
+    # Check if the log file contains the phrase "finished without error at"
+    if grep -q "finished without error at" "$log_file"; then
+        echo "recon-all completed successfully for $log_file"
+    else
+        echo "recon-all encountered an error in $log_file"
+    fi
+done
+
+#====================================================================
+# Execute MRI Parcellation
+#====================================================================
+
+#NOTE: the FSaverage parcellations you want to use should have been copied into your
+#fsaverage.
+#=----------------- Execute MRI Parcellation ---------------------------
+metaLog=${metaLog_DIR}/submission_abcd_parcellate_array_${assessment}.log
+
+
+echo "This is a run from $(date)" | tee -a ${metaLog}
+echo "****running PARCELLATE script *******" | tee -a ${metaLog}
+
+    sbatch --array=0-$((${block_length}-1)) --account=BETHLEHEM-SL3-CPU \
+           --output=${TEMP_log}/job_%A_%a.log \
+            ${code_dir}/abcd_parcellate_array.sh ${sublist} ${dataDir} ${assessment} ${arm} ${metaDir} ${block_length}   0 >> ${metaLog} 2>&1 
+
+    # sbatch --array=0-$((${block_length}-1)) --account=BETHLEHEM-SL3-CPU \
+    #        --output=${TEMP_log}/job_%A_%a.log \
+    #         ${code_dir}/abcd_parcellate_array.sh ${sublist} ${dataDir} ${assessment} ${arm} ${metaDir} ${block_length}   1 >> ${metaLog} 2>&1 
+
+echo "****submitted all subs in PARCELLATE script*******" | tee -a ${metaLog}
