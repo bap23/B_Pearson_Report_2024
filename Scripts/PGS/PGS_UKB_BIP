@@ -58,12 +58,7 @@ echo "Conda PRSenv Activated, Running PRScs Now."
 # head daner_bip_pgc3_nm_noukbiobank # To determine which columns I needed (2, 4, 5, 9, 11)
 # awk '{print $2, $4, $5, $9, $11}' daner_bip_pgc3_nm_noukbiobank > PGS_UKB_Bipolar_2021_PGCnoUKB.txt
 
-
 python /home/bp520/rds/hpc-work/PGS_UKB/PRScs/PRScs.py --ref_dir=/home/bp520/rds/hpc-work/PGS_UKB/LD/ldblk_ukbb_eur --bim_prefix=/home/bp520/rds/rds-rb643-ukbiobank2/Data_Genetics/Genetic_data/Neuroimaging_samples/fileforclumping --sst_file=/home/bp520/rds/hpc-work/PGS_UKB/Zip_Files/Bipolar_zip/PGS_UKB_Bipolar_2021_PGCnoUKB.txt --n_gwas=353899 --out_dir=/home/bp520/rds/hpc-work/PGS_UKB/Bipolar --phi=1e-2
 # This line executes the Python script PRScs.py with specified parameters. 
 # Parameters include references to directories (--ref_dir), input files (--bim_prefix, --sst_file), numerical values (--n_gwas, --phi), and an output directory (--out_dir).
 echo "Job Finished"
-
-# # To submit a batch job: 
-# sbatch PGS_UKB_Bipolar.sh
-# Submitted batch job 52510609
