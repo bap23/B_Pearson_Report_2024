@@ -1,0 +1,220 @@
+# Final Script to run lmer for global measures, extract the models, and create Data Frame/excel 
+# Created on: 04/08/2024
+# Author: Bess Pearson
+# Version: 1.0 
+
+# Load necessary packages
+library(dplyr)
+library(lme4)
+library(openxlsx)
+
+#---------------Running LMER-------------------
+# Set the directory path
+directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames/Final_aparc/Scaled/Scaled_ROIs_PCs/LMER"
+
+# Define the list of CSV files for LMER
+csv_files_lmer <- c("Processed_Scaled_Final_aparc_GMV_LMER.csv",
+                    "Processed_Scaled_Final_aparc_SA_LMER.csv",
+                    "Processed_Scaled_Final_aparc_CT_LMER.csv")
+csv_files_lmer <- file.path(directory, csv_files_lmer)
+
+# Define fixed effects (including PGS)
+age <- "age"
+pgs_columns <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD")
+sex <- "sex"
+other_covariates <- c("site", paste0("X22009.0.", 1:20), "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Define random effect
+random_effect <- "(1|Subject)"
+
+# Define output directory
+output_directory_lmer <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER"
+
+# Map phenotype to global column names
+phenotype_to_global_column <- list(
+  "CT" = "scaled_global_CT",
+  "SA" = "scaled_global_SA",
+  "GMV" = "scaled_global_GMV"
+)
+
+# Function to run linear mixed-effects models for a specific file and save results
+run_lmer_and_save <- function(file, output_directory) {
+  # Extract phenotype from file name
+  file_name <- basename(file)
+  phenotype <- gsub("Processed_Scaled_Final_aparc_|_LMER.csv", "", file_name)
+  
+  # Determine the global column based on phenotype
+  global_column <- phenotype_to_global_column[[phenotype]]
+  
+  # Check if the phenotype is valid
+  if (is.null(global_column)) {
+    cat("\nUnknown phenotype in file:", file_name, "\n")
+    return(NULL)
+  }
+  
+  # Read the CSV file into a dataframe
+  data <- read.csv(file)
+  
+  # Print the file being processed
+  cat("\nProcessing file:", file_name, "\n")
+  
+  # Initialize list to store model outputs
+  model_outputs <- list()
+  
+  # Loop through each PGS column
+  for (pgs_column in pgs_columns) {
+    # Construct formula for linear mixed-effects model
+    formula_string <- paste0(global_column, " ~ ", random_effect, " + ", age, " * ", pgs_column, " + ", sex, " + ", paste(other_covariates, collapse = " + "))
+    formula_with_PGS <- as.formula(formula_string)
+    print(formula_with_PGS) # To check formula
+    
+    # Fit the linear mixed-effects model
+    cat(paste0("\nCurrently running model for global column: ", global_column, " with PGS: ", pgs_column, "\n"))
+    
+    # Fit the model with error handling
+    model_with_PGS <- try(lmer(formula_with_PGS, data = data), silent = TRUE)
+    
+    # Check if the model fitting was successful
+    if (!inherits(model_with_PGS, "try-error")) {
+      cat("\nModel fitted successfully with PGS:", pgs_column, "\n")
+      model_outputs[[pgs_column]] <- summary(model_with_PGS)
+    } else {
+      cat("\nError fitting model with PGS:", pgs_column, "\n")
+      model_outputs[[pgs_column]] <- NA
+    }
+  }
+  
+  # Save the model outputs to a file
+  output_file <- file.path(output_directory, paste0("model_outputs_global_", phenotype, "_LMER.rds"))
+  saveRDS(model_outputs, file = output_file)
+  return(model_outputs)
+}
+
+# Run and save models for each file
+model_outputs_lmer_list <- lapply(csv_files_lmer, function(file) {
+  run_lmer_and_save(file, output_directory_lmer)
+})
+
+#--------Checking to see if they ran: LMER-----------------
+list.files(output_directory_lmer, pattern = "model_outputs_global_.*_LMER.rds")
+
+# Load and print model outputs for LMER
+gmv_model_outputs <- readRDS(file.path(output_directory_lmer, "model_outputs_global_GMV_LMER.rds"))
+sa_model_outputs <- readRDS(file.path(output_directory_lmer, "model_outputs_global_SA_LMER.rds"))
+ct_model_outputs <- readRDS(file.path(output_directory_lmer, "model_outputs_global_CT_LMER.rds"))
+
+# Print summaries of some of the models
+print(names(gmv_model_outputs))
+print(names(sa_model_outputs))
+print(names(ct_model_outputs))
+
+# Print summary of a specific model (e.g., scaled_global_GMV and scaledscore_ADHD)
+print(gmv_model_outputs[[1]])
+print(sa_model_outputs[[1]])
+print(ct_model_outputs[[1]])
+
+#---------------Extraction---------------------------
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER")
+
+output_directory_lmer <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER"
+
+sa_model_outputs <- readRDS(file.path(output_directory_lmer, "model_outputs_global_SA_LMER.rds"))
+ct_model_outputs <- readRDS(file.path(output_directory_lmer, "model_outputs_global_CT_LMER.rds"))
+gmv_model_outputs <- readRDS(file.path(output_directory_lmer, "model_outputs_global_GMV_LMER.rds"))
+
+# Define the function to process model outputs
+process_model_outputs <- function(model_outputs, output_file_name) {
+  # Create an empty list to store results
+  output_list <- list()
+  
+  # Loop through each element in model_outputs
+  for (i in seq_along(model_outputs)) {
+    # Get the names of coefficients with the prefix "scaledscore_" or "age:scaledscore_"
+    scaledscore_vars <- grep("^(scaledscore_|age:scaledscore_)", rownames(model_outputs[[i]]$coefficients), value = TRUE)
+    
+    # Initialize variables to store estimates and other statistics
+    estimate_score <- NA
+    std_error_score <- NA
+    t_value_score <- NA
+    p_value_score <- NA
+    
+    estimate_interaction <- NA
+    std_error_interaction <- NA
+    t_value_interaction <- NA
+    p_value_interaction <- NA
+    
+    # Loop through each scaledscore variable
+    for (scaledscore_var in scaledscore_vars) {
+      # Extract coefficients for the current scaledscore variable
+      estimate <- model_outputs[[i]]$coefficients[scaledscore_var, "Estimate"]
+      std_error <- model_outputs[[i]]$coefficients[scaledscore_var, "Std. Error"]
+      t_value <- model_outputs[[i]]$coefficients[scaledscore_var, "t value"]
+      
+      # Calculate the p-value
+      p_value <- 2 * pnorm(abs(t_value), lower.tail = FALSE)
+      
+      # Check if the current variable is the main effect or interaction term
+      if (grepl("^scaledscore_", scaledscore_var)) {
+        estimate_score <- estimate
+        std_error_score <- std_error
+        t_value_score <- t_value
+        p_value_score <- p_value
+      } else if (grepl("^age:scaledscore_", scaledscore_var)) {
+        estimate_interaction <- estimate
+        std_error_interaction <- std_error
+        t_value_interaction <- t_value
+        p_value_interaction <- p_value
+      }
+    }
+    
+    # Extract PGS name from element name
+    element_name <- names(model_outputs)[i]
+    PGS <- gsub("^.*_scaledscore_", "", element_name)
+    
+    # Create a data frame for the current element
+    output_df <- data.frame(
+      PGS = PGS,
+      Estimate_Score = estimate_score,
+      Std_Error_Score = std_error_score,
+      t_value_Score = t_value_score,
+      p_value_Score = p_value_score,
+      Significant_p_value_Score = ifelse(p_value_score < 0.05, "sig", "not sig"),
+      Estimate_Interaction = estimate_interaction,
+      Std_Error_Interaction = std_error_interaction,
+      t_value_Interaction = t_value_interaction,
+      p_value_Interaction = p_value_interaction,
+      Significant_p_value_Interaction = ifelse(p_value_interaction < 0.05, "sig", "not sig")
+    )
+    
+    # Append the data frame to the list
+    output_list[[length(output_list) + 1]] <- output_df
+  }
+  
+  # Combine all data frames in the list into a single data frame
+  combined_output_df <- do.call(rbind, output_list)
+  
+  # Save the combined data frame to a CSV file in the specified directory
+  write.csv(combined_output_df, file.path(output_directory_lmer, output_file_name), row.names = FALSE)
+}
+
+# Process model outputs
+process_model_outputs(ct_model_outputs, "CT_UKB_LMER_Global.csv")
+process_model_outputs(sa_model_outputs, "SA_UKB_LMER_Global.csv")
+process_model_outputs(gmv_model_outputs, "GMV_UKB_LMER_Global.csv")
+
+#---------------Combine all three (CT, SA, GMV), add DK region, and adding left or right hemi---------------------------
+# Read each CSV file into a data frame
+CT_df <- read.csv("CT_UKB_LMER_Global.csv")
+SA_df <- read.csv("SA_UKB_LMER_Global.csv")
+GMV_df <- read.csv("GMV_UKB_LMER_Global.csv")
+
+# Add a Phenotype column to each data frame
+CT_df$Phenotype <- "CT"
+SA_df$Phenotype <- "SA"
+GMV_df$Phenotype <- "GMV"
+
+# Combine all data frames into a single data frame
+all_phenotypes_df <- rbind(CT_df, SA_df, GMV_df)
+
+# Save the combined data frame to a CSV file
+write.csv(all_phenotypes_df, file = "All_Phenotypes_UKB_LMER_Final_Global.csv", row.names = FALSE)
