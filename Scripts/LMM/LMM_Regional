@@ -1,0 +1,354 @@
+# Final Script to run lm for T0 and T1, extract the models, and create Data Frame for further visualization
+# Created on: 14/07/2024
+# Author: Bess Pearson
+# Version: 1.0 
+
+library(dplyr)
+library(tidyr)
+
+# Set working directiory: 
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames/Final_aparc/Scaled/Scaled_ROIs_PCs")
+
+#---------------Running LM for T0-------------------
+# Set the directory path
+directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames/Final_aparc/Scaled/Scaled_ROIs_PCs/LMM"
+
+# List of specific CSV files for T0
+csv_files_T0 <- c("Scaled_Final_aparc_CT_T0.csv", "Scaled_Final_aparc_SA_T0.csv", "Scaled_Final_aparc_GMV_T0.csv")
+csv_files_T0 <- file.path(directory, csv_files_T0)
+print(basename(csv_files_T0))
+
+# List of PGS column names
+pgs_columns <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD")
+
+# Set the other covariates
+other_covariates <- c("site", "Agesquared", "Age_Sex", "Agesquared_sex", paste0("X22009.0.", 1:20), "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Function to run linear models and save results
+run_lm_and_save <- function(csv_files, type, output_directory) {
+  model_outputs <- list()
+  
+  for (file in csv_files) {
+    # Read the CSV file into a dataframe
+    data <- read.csv(file)
+    
+    # Print the file being processed
+    cat("\nData from file:", basename(file), "\n")
+    
+    # Loop through each brain region column
+    for (brain_region in grep("^lh_|^rh_", names(data), value = TRUE)) {
+      
+      # Loop through each PGS column
+      for (pgs_column in pgs_columns) {
+        
+        # Construct the formula for linear regression with PGS using reformulate
+        formula_with_PGS <- reformulate(termlabels = c("age", pgs_column, "sex", other_covariates), response = brain_region)
+        
+        # Fit the linear regression model
+        cat(paste0("\nCurrently running model for T0: ", paste(deparse(formula_with_PGS), collapse = " "), "\n"))
+        
+        # Fit the model with error handling
+        model_with_PGS <- try(lm(formula_with_PGS, data = data), silent = TRUE)
+        
+        # Check if the model fitting was successful
+        if (!inherits(model_with_PGS, "try-error")) {
+          cat("\nSummary of the model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+          print(summary(model_with_PGS))
+          model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- summary(model_with_PGS)
+        } else {
+          cat("\nError fitting model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+          model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- NA
+        }
+      }
+    }
+  }
+  
+  # Save the model outputs to a file
+  output_file <- file.path(output_directory, paste0(type, "_model_outputs_T0.rds"))
+  saveRDS(model_outputs, file = output_file)
+  return(model_outputs)
+}
+
+# Set the output directory
+output_directory_T0 <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Run and save models for each type
+sa_files <- grep("SA_T0.csv", csv_files_T0, value = TRUE)
+ct_files <- grep("CT_T0.csv", csv_files_T0, value = TRUE)
+gmv_files <- grep("GMV_T0.csv", csv_files_T0, value = TRUE)
+
+sa_model_outputs_T0 <- run_lm_and_save(sa_files, "SA", output_directory_T0)
+ct_model_outputs_T0 <- run_lm_and_save(ct_files, "CT", output_directory_T0)
+gmv_model_outputs_T0 <- run_lm_and_save(gmv_files, "GMV", output_directory_T0)
+
+#--------Checking to see if they ran: T0-----------------
+list.files(output_directory_T0, pattern = "model_outputs_T0.rds")
+# [1] "CT_model_outputs_T0.rds"  "GMV_model_outputs_T0.rds" "SA_model_outputs_T0.rds" 
+
+# Load the saved model outputs
+sa_model_outputs_T0 <- readRDS(file.path(output_directory_T0, "SA_model_outputs_T0.rds"))
+ct_model_outputs_T0 <- readRDS(file.path(output_directory_T0, "CT_model_outputs_T0.rds"))
+gmv_model_outputs_T0 <- readRDS(file.path(output_directory_T0, "GMV_model_outputs_T0.rds"))
+
+# Print summaries of some of the models (Should have 408 (68 regions * 6 conditions))
+print(names(sa_model_outputs_T0))
+print(names(ct_model_outputs_T0))
+print(names(gmv_model_outputs_T0))
+
+# Print summary of a specific model (e.g. - lh_bankssts and scaledscore_ADHD)
+print(sa_model_outputs_T0[[1]])
+print(ct_model_outputs_T0[[1]])
+print(gmv_model_outputs_T0[[1]])
+
+#---------------Running LM for T1-------------------
+# Set the directory path for T1
+directory_T1 <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames/Final_aparc/Scaled/Scaled_ROIs_PCs/LMM"
+
+# List of specific CSV files for T1
+csv_files_T1 <- c("Scaled_Final_aparc_CT_T1.csv", "Scaled_Final_aparc_SA_T1.csv", "Scaled_Final_aparc_GMV_T1.csv")
+csv_files_T1 <- file.path(directory_T1, csv_files_T1)
+print(basename(csv_files_T1)) 
+
+# Function to run linear models and save results for T1
+run_lm_and_save_T1 <- function(csv_files, type, output_directory) {
+  model_outputs <- list()
+  
+  for (file in csv_files) {
+    # Read the CSV file into a dataframe
+    data <- read.csv(file)
+    
+    # Print the file being processed
+    cat("\nData from file:", basename(file), "\n")
+    
+    # Loop through each brain region column
+    for (brain_region in grep("^lh_|^rh_", names(data), value = TRUE)) {
+      
+      # Loop through each PGS column
+      for (pgs_column in pgs_columns) {
+        
+        # Construct the formula for linear regression with PGS using reformulate
+        formula_with_PGS <- reformulate(termlabels = c("age", pgs_column, "sex", other_covariates), response = brain_region)
+        
+        # Fit the linear regression model
+        cat(paste0("\nCurrently running model for T1: ", paste(deparse(formula_with_PGS), collapse = " "), "\n"))
+        
+        # Fit the model with error handling
+        model_with_PGS <- try(lm(formula_with_PGS, data = data), silent = TRUE)
+        
+        # Check if the model fitting was successful
+        if (!inherits(model_with_PGS, "try-error")) {
+          cat("\nSummary of the model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+          print(summary(model_with_PGS))
+          model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- summary(model_with_PGS)
+        } else {
+          cat("\nError fitting model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+          model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- NA
+        }
+      }
+    }
+  }
+  
+  # Save the model outputs to a file
+  output_file <- file.path(output_directory, paste0(type, "_model_outputs_T1.rds"))
+  saveRDS(model_outputs, file = output_file)
+  return(model_outputs)
+}
+
+# Set the output directory for T1
+output_directory_T1 <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Run and save models for each type at T1
+sa_files_T1 <- grep("SA_T1.csv", csv_files_T1, value = TRUE)
+ct_files_T1 <- grep("CT_T1.csv", csv_files_T1, value = TRUE)
+gmv_files_T1 <- grep("GMV_T1.csv", csv_files_T1, value = TRUE)
+
+sa_model_outputs_T1 <- run_lm_and_save_T1(sa_files_T1, "SA", output_directory_T1)
+ct_model_outputs_T1 <- run_lm_and_save_T1(ct_files_T1, "CT", output_directory_T1)
+gmv_model_outputs_T1 <- run_lm_and_save_T1(gmv_files_T1, "GMV", output_directory_T1)
+
+#--------Checking to see if they ran: T1-----------------
+list.files(output_directory_T1, pattern = "model_outputs_T1.rds")
+# [1] "CT_model_outputs_T1.rds"  "GMV_model_outputs_T1.rds" "SA_model_outputs_T1.rds" 
+
+# Load the saved model outputs
+sa_model_outputs_T1 <- readRDS(file.path(output_directory_T1, "SA_model_outputs_T1.rds"))
+ct_model_outputs_T1 <- readRDS(file.path(output_directory_T1, "CT_model_outputs_T1.rds"))
+gmv_model_outputs_T1 <- readRDS(file.path(output_directory_T1, "GMV_model_outputs_T1.rds"))
+
+# Print summaries of some of the models (Should have 408 (68 regions * 6 conditions))
+print(names(sa_model_outputs_T1))
+print(names(ct_model_outputs_T1))
+print(names(gmv_model_outputs_T1))
+
+# Print summary of a specific model (e.g. - lh_bankssts and scaledscore_ADHD)
+print(sa_model_outputs_T1[[1]])
+print(ct_model_outputs_T1[[1]])
+print(gmv_model_outputs_T1[[1]])
+
+#---------------Extraction-------------------
+extraction_directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Set the p-value threshold
+p_value_threshold <- 0.0000977
+
+ct_model_outputs_T0 <- readRDS(file.path(extraction_directory, "CT_model_outputs_T0.rds"))
+sa_model_outputs_T0 <- readRDS(file.path(extraction_directory, "SA_model_outputs_T0.rds"))
+gmv_model_outputs_T0 <- readRDS(file.path(extraction_directory, "GMV_model_outputs_T0.rds"))
+ct_model_outputs_T1 <- readRDS(file.path(extraction_directory, "CT_model_outputs_T1.rds"))
+sa_model_outputs_T1 <- readRDS(file.path(extraction_directory, "SA_model_outputs_T1.rds"))
+gmv_model_outputs_T1 <- readRDS(file.path(extraction_directory, "GMV_model_outputs_T1.rds"))
+
+# Define the function to process model outputs
+process_model_outputs <- function(model_outputs, output_file_name) {
+  # Create an empty list to store results
+  output_list <- list()
+  
+  # Loop through each element in the model outputs
+  for (i in seq_along(model_outputs)) {
+    # Get the names of coefficients with the prefix "scaledscore_"
+    scaledscore_vars <- grep("^scaledscore_", rownames(model_outputs[[i]]$coefficients), value = TRUE)
+    
+    # Loop through each scaledscore variable
+    for (scaledscore_var in scaledscore_vars) {
+      # Extract coefficients for the current scaledscore variable
+      estimate <- model_outputs[[i]]$coefficients[scaledscore_var, "Estimate"]
+      std_error <- model_outputs[[i]]$coefficients[scaledscore_var, "Std. Error"]
+      t_value <- model_outputs[[i]]$coefficients[scaledscore_var, "t value"]
+      p_value <- model_outputs[[i]]$coefficients[scaledscore_var, "Pr(>|t|)"]
+      
+      # Extract brain region and PGS name from element name
+      element_name <- names(model_outputs)[i]
+      Brain_Region <- gsub("_scaledscore_.*", "", element_name)
+      PGS <- gsub("^.*_scaledscore_", "", element_name)
+      
+      # Create a data frame for the current scaledscore variable
+      output_df <- data.frame(
+        Brain_Region = Brain_Region,
+        PGS = PGS,
+        Estimate = estimate,
+        Std_Error = std_error,
+        t_value = t_value,
+        P_Value = p_value,
+        Significant_P_Value = ifelse(p_value < p_value_threshold, "sig", "not sig")
+      )
+      
+      # Append the data frame to the list
+      output_list[[length(output_list) + 1]] <- output_df
+    }
+  }
+  
+  # Combine all data frames in the list into a single data frame
+  combined_output_df <- do.call(rbind, output_list)
+  
+  # Print the combined data frame
+  print(combined_output_df)
+  
+  # Save the combined data frame to a CSV file in the specified directory
+  write.csv(combined_output_df, file.path(output_directory, output_file_name), row.names = FALSE)
+}
+
+# Set output directory
+output_directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Process T0 model outputs
+process_model_outputs(ct_model_outputs_T0, "CT_UKB_LMM_T0.csv")
+process_model_outputs(sa_model_outputs_T0, "SA_UKB_LMM_T0.csv")
+process_model_outputs(gmv_model_outputs_T0, "GMV_UKB_LMM_T0.csv")
+
+# Process T1 model outputs
+process_model_outputs(ct_model_outputs_T1, "CT_UKB_LMM_T1.csv")
+process_model_outputs(sa_model_outputs_T1, "SA_UKB_LMM_T1.csv")
+process_model_outputs(gmv_model_outputs_T1, "GMV_UKB_LMM_T1.csv")
+
+#---------------Combine all three (CT, SA, GMV), add DK region, and adding left or right hemi---------------------------
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs")
+
+# Read CSV files into separate data frames
+ct_t0 <- read.csv("CT_UKB_LMM_T0.csv")
+ct_t1 <- read.csv("CT_UKB_LMM_T1.csv")
+sa_t0 <- read.csv("SA_UKB_LMM_T0.csv")
+sa_t1 <- read.csv("SA_UKB_LMM_T1.csv")
+gmv_t0 <- read.csv("GMV_UKB_LMM_T0.csv")
+gmv_t1 <- read.csv("GMV_UKB_LMM_T1.csv")
+
+# Add a Phenotype column to each data frame
+ct_t0$Phenotype <- "CT"
+ct_t1$Phenotype <- "CT"
+sa_t0$Phenotype <- "SA"
+sa_t1$Phenotype <- "SA"
+gmv_t0$Phenotype <- "GMV"
+gmv_t1$Phenotype <- "GMV"
+
+# Add a Timepoint column to each data frame
+ct_t0$Timepoint <- "T0"
+ct_t1$Timepoint <- "T1"
+sa_t0$Timepoint <- "T0"
+sa_t1$Timepoint <- "T1"
+gmv_t0$Timepoint <- "T0"
+gmv_t1$Timepoint <- "T1"
+
+# Combine all data frames into a single data frame
+all_phenotypes_df <- rbind(ct_t0, ct_t1, sa_t0, sa_t1, gmv_t0, gmv_t1)
+
+# Split the Brain_Region column into hemi and region
+all_phenotypes_df_hemi <- all_phenotypes_df %>%
+  separate(Brain_Region, into = c("Hemi", "Region"), sep = "_", remove = FALSE) %>%
+  mutate(Hemi = ifelse(Hemi == "lh", "left", 
+                             ifelse(Hemi == "rh", "right", Hemi)))
+
+# Now changing the Region column, to fit the dk atlas
+dk_regions <- unique(ggseg::dk$data$region)
+unique_regions <- unique(all_phenotypes_df_hemi$region)
+print(unique_regions)
+
+region_mapping <- c(
+  "bankssts" = "bankssts",
+  "caudalanteriorcingulate" = "caudal anterior cingulate",
+  "caudalmiddlefrontal" = "caudal middle frontal",
+  "cuneus" = "cuneus",
+  "entorhinal" = "entorhinal",
+  "fusiform" = "fusiform",
+  "inferiorparietal" = "inferior parietal",
+  "inferiortemporal" = "inferior temporal",
+  "isthmuscingulate" = "isthmus cingulate",
+  "lateraloccipital" = "lateral occipital",
+  "lateralorbitofrontal" = "lateral orbitofrontal",
+  "lingual" = "lingual",
+  "medialorbitofrontal" = "medial orbitofrontal",
+  "middletemporal" = "middle temporal",
+  "parahippocampal" = "parahippocampal",
+  "paracentral" = "paracentral",
+  "parsopercularis" = "pars opercularis",
+  "parsorbitalis" = "pars orbitalis",
+  "parstriangularis" = "pars triangularis",
+  "pericalcarine" = "pericalcarine",
+  "postcentral" = "postcentral",
+  "posteriorcingulate" = "posterior cingulate",
+  "precentral" = "precentral",
+  "precuneus" = "precuneus",
+  "rostralanteriorcingulate" = "rostral anterior cingulate",
+  "rostralmiddlefrontal" = "rostral middle frontal",
+  "superiorfrontal" = "superior frontal",
+  "superiorparietal" = "superior parietal",
+  "superiortemporal" = "superior temporal",
+  "supramarginal" = "supramarginal",
+  "frontalpole" = "frontal pole",
+  "temporalpole" = "temporal pole",
+  "transversetemporal" = "transverse temporal",
+  "insula" = "insula"
+)
+
+map_region <- function(region) {
+  ifelse(region %in% names(region_mapping), region_mapping[region], region)
+}
+
+# Apply region mapping
+all_phenotypes_df_final <- all_phenotypes_df_hemi %>%
+  mutate(Region = map_region(Region))
+
+# Change the Brain_Region column to label
+all_phenotypes_df_final <- all_phenotypes_df_final %>%
+  rename(label = Brain_Region)
+
+# Save the combined data frame to a CSV file
+write.csv(all_phenotypes_df_final, file = "All_Phenotypes_UKB_LMM_Final.csv", row.names = FALSE)
