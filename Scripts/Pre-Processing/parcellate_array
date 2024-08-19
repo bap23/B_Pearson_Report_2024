@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# Iterates across all subjects to transform the parcellation from standard space to native space
+#====================================================================
+# Read in parameters from meta-script
+#====================================================================
+
+#1. List of subjects to iterate through
+sublist=$1
+
+#2. BIDS directory // Separate from metaDir as precaution.
+dataDir=$2
+
+#3. Wave and assessment
+assessment=$3
+
+#4. Arm
+arm=$4
+
+#5. Meta-directory: Where your logs & code are located
+metaDir=$5
+
+#6. How long is the length of subjects being considered?
+block_length=$6
+
+#7. Block: segment of subjects we are working through
+block=$7
+
+#====================================================================
+# Specify this script's parameters
+#====================================================================
+#(a) Determine the subject in the filelist 
+# You sum 1 to offset the zero-based indexing
+subject_pos_file=$((1 + ${SLURM_ARRAY_TASK_ID} + (${block}* ${block_length}) ))
+sub=$(sed -n ${subject_pos_file}p ${sublist})
+
+#(b) location of script to submit
+scriptDir=${metaDir}/code 
+
+#(c) location of log files for THIS script
+logDir=${metaDir}/logs/abcd_parcellate/${assessment}/
+
+#----- Checks:
+# Check if logDir does not exist and create it if necessary
+if [ ! -d "$logDir" ]; then
+  mkdir -p "$logDir"
+fi
+
+#(d) create output file
+outputFile="${logDir}/${sub}_abcd_parcellate.log"
+
+#====================================================================
+# Submit array jobs
+#====================================================================
+echo "this is code running from inside abcd_parcellate_array.sh" >> ${outputFile} 2>&1
+
+    # Check that fs preprocessing has been done
+	if [ -f ${dataDir}/${sub}/${assessment}/surfaces/${sub}/label/rh.aparc.annot ]; then
+	   if [ ! -f ${dataDir}/${sub}/${assessment}/surfaces/${sub}/stats/rh.HCP.fsaverage.aparc.log ]; then
+		run_subj=true
+           else
+		size_log=$(stat --printf="%s" ${dataDir}/${sub}/${assessment}/surfaces/${sub}/stats/rh.HCP.fsaverage.aparc.log)
+           	if [ "$size_log" -gt "200" ]; then
+			run_subj=false
+		else
+			run_subj=true
+		fi
+	   fi
+   run_subj=true
+
+	   if [ "$run_subj" == true ]; then
+
+		#==================Submit parcellation jobs in array====================================
+		echo "submitting script ${scriptDir}/abcd_parcellate.sh" >> ${outputFile} 2>&1
+
+		sh  ${scriptDir}/abcd_parcellate_from_zero.sh ${sub} ${dataDir} ${assessment} ${arm} ${metaDir} >> ${outputFile} 2>&1
+
+
+		echo "${sub} submitted!" >> ${outputFile} 2>&1
+	   else
+		echo "${sub} already parcellated!" >> ${outputFile} 2>&1
+	   fi
+
+	else
+	   echo "${sub} Incomplete reconstruction" >> ${outputFile} 2>&1
+	fi
+
+
+# Delete automatic log file if needed
+#====================================================================
+TEMP_log="${metaDir}/logs/Tmp"
+file="${TEMP_log}/job_${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}.log"
+
+# Check if the file exists and is empty
+if [ -f "$file" ] && [ ! -s "$file" ]; then
+    rm "$file" # Delete the file if it exists and is empty
+    echo "Empty array log deleted: $file" >> ${outputFile} 2>&1
+else
+    echo "Array log file is not empty or does not exist." >> ${outputFile} 2>&1
+fi
