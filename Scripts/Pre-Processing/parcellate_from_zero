@@ -1,13 +1,11 @@
 #!/bin/bash
 
-######
-# Transform the parcellation from standard space and obtain parcellations in native space.
+# GOAL: Transform the parcellation from standard space and obtain parcellations in native space.
 # Created by: Rafael Romero Garcia - rr480@cam.ac.uk
 # University of Cambridge 2017
 # Edited by: S. Orellana - sdco2@cam.ac.uk (2023)
 # Adapted by: Bess Pearson
 # WARNING: this script deletes any existing files created in a previous attempt to parcellate specified parcellations before computing them again.
-#####
 
 #====================================================================
 # load modules
