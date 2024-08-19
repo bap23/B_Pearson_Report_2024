@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# GOAL: Meta-submission of (1) run_freesurfer_batch and (2) abcd_parcellate_batch.
+# GOAL: Meta-submission of (1) run_freesurfer_batch and (2) parcellate_batch
 # University of Cambridge 2023
 # Adapted by: Bess Pearson 
 
