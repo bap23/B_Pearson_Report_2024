@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# This script runs freesurfer on HPC for subs with T1 and T2 or
-# T1 only if no T2 is present.
+# GOAL: This script runs freesurfer on HPC for subs with T1 and T2 or T1 only if no T2 is present.
+
+#====================================================================
 # load modules
 #====================================================================
 . /etc/profile.d/modules.sh                # Leave this line (enables the module command)
@@ -10,6 +11,7 @@ module load rhel8/default-icl              # if submitting to icelake
 module load freesurfer/7.1.0
 echo "this output is from inside run_freesurfer_conditional.sh"
 echo "script started at $(date)"
+
 #====================================================================
 # Read in parameters
 #====================================================================
@@ -29,6 +31,7 @@ arm=$4
 
 #====================================================================
 # change to overearching bids directory
+#====================================================================
 basedir=${dataDir}/${subject}
 surfdir=${basedir}/${assessment}/surfaces/
 tmpDIR=/home/bp520/rds/hpc-work/Pre-Processing/TempDir
