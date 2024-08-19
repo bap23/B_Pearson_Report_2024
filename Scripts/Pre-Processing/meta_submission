@@ -82,12 +82,9 @@ done
 #====================================================================
 # Execute MRI Parcellation
 #====================================================================
+#NOTE: the FSaverage parcellations you want to use should have been copied into your fsaverage.
 
-#NOTE: the FSaverage parcellations you want to use should have been copied into your
-#fsaverage.
-#=----------------- Execute MRI Parcellation ---------------------------
 metaLog=${metaLog_DIR}/submission_abcd_parcellate_array_${assessment}.log
-
 
 echo "This is a run from $(date)" | tee -a ${metaLog}
 echo "****running PARCELLATE script *******" | tee -a ${metaLog}
