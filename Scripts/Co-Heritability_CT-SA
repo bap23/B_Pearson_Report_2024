@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Note: Script for co-heritability of CT-SA at T0
+
+# Paths
+path_gcta=/home/bp520/rds/hpc-work/Heritability_and_Co-Heritability
+path_grm=${path_gcta}/GRM/unrelated_15k
+
+# Check if GRM files exist
+if [[ ! -f "${path_grm}.grm.bin" || ! -f "${path_grm}.grm.N.bin" || ! -f "${path_grm}.grm.id" ]]; then
+    echo "One or more GRM files are missing. Please check the following files:"
+    echo "${path_grm}.grm.bin"
+    echo "${path_grm}.grm.N.bin"
+    echo "${path_grm}.grm.id"
+    exit 1
+fi
+
+# Initialize ROI names array
+roi_names=()
+filename="$path_gcta/roi_names.txt"
+while IFS= read -r line; do
+    roi_names+=("$line")
+done < "$filename"
+
+# Define phenotype files
+file1="$path_gcta/Phenotype/CT/CT_T0_GCTA.txt"
+file2="$path_gcta/Phenotype/SA/SA_T0_GCTA.txt"
+
+# Paths to covariate files
+cat_covar=/home/bp520/rds/hpc-work/Covariates/WMcovardiscrete_structural.txt
+quant_covar=/home/bp520/rds/hpc-work/Covariates/WMqcovar.txt
+
+# Create output directories
+path_output="${path_gcta}/gcta_all_output/co_heritability/CT_SA"
+mkdir -p "$path_output/files_hsq"
+mkdir -p "$path_output/files_log"
+mkdir -p "$path_output/all_roi_results"
+
+# Define paths for output files
+output_co_herit="$path_output/all_roi_results/co_herit_CT_SA.txt"
+co_herit_hsq="$path_output/files_hsq/co_herit_CT_SA"
+co_herit_log="$path_output/files_log/co_herit_CT_SA_%A_%a.log"
+
+# Create or overwrite the output file and add a header (only in the first task)
+if [[ $SLURM_ARRAY_TASK_ID -eq 0 ]]; then
+    echo -e "Regions\trG\tSE" > "$output_co_herit"
+fi
+
+# Create temporary files for the phenotypes
+output1="${path_output}/output1_CT_SA.txt"
+output2="${path_output}/output2_CT_SA.txt"
+awk 'NR==FNR{a[$2]; next} $2 in a' "$file2" "$file1" > "$output1"
+awk 'NR==FNR{a[$2]; next} $2 in a' "$file1" "$file2" > "$output2"
+
+# Get the ROI index from the array job ID
+roi_index=$SLURM_ARRAY_TASK_ID
+roi_name=${roi_names[$roi_index]}
+echo "Processing ROI: $roi_index - $roi_name"
+
+# Extract and merge the necessary columns for co-heritability
+path_co_pheno="${path_output}/co_pheno_CT_SA_${roi_index}.txt"
+: > "${path_co_pheno}"
+
+# Adjust index to match the start of ROI columns
+# Extract phenotype values for file1
+awk -v k=$((roi_index+3)) '{print $1, $2, $k}' "$output1" > "${path_output}/pheno1_CT_SA_${roi_index}.txt"
+awk -v k=$((roi_index+3)) '{print $k}' "$output2" > "${path_output}/pheno2_CT_SA_${roi_index}.txt"
+paste "${path_output}/pheno1_CT_SA_${roi_index}.txt" "${path_output}/pheno2_CT_SA_${roi_index}.txt" > "$path_co_pheno"
+
+# Calculate co-heritability
+/home/bp520/rds/hpc-work/software/gcta-1.94.1-linux-kernel-3-x86_64/gcta64 \
+    --reml-bivar 1 2 \
+    --grm "$path_grm" \
+    --pheno "$path_co_pheno" \
+    --covar "$cat_covar" \
+    --qcovar "$quant_covar" \
+    --out "${co_herit_hsq}_${roi_index}" \
+    --grm-cutoff 0.05 > "$co_herit_log"
+
+if [[ $? -ne 0 ]]; then
+    echo "GCTA failed for ROI: $roi_name in files: ${file1} and ${file2}" >> "$co_herit_log"
+    exit 1
+fi
+
+# Extract co-heritability values
+valueV=$(grep 'rG' "${co_herit_hsq}_${roi_index}.hsq" | awk '{print $2}')
+valueSE=$(grep 'rG' "${co_herit_hsq}_${roi_index}.hsq" | awk '{print $3}')
+
+# Append the ROI name and co-heritability value to the output file
+echo -e "${roi_name}\t${valueV}\t${valueSE}" >> "$output_co_herit"
+
+# Indicate successful processing of ROI
+echo "Successfully processed ROI: $roi_name"
