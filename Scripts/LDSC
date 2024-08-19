@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# ldsc is a command line tool for estimating heritability and genetic correlation from GWAS summary statistics. 
+# ldsc also computes LD Scores.
+
+# Activate ldsc environment:
+conda activate ldsc
+
+# Install appropriate packages: 
+conda install scipy
+
+# Check if scipy is installed:
+if ! conda list scipy | grep scipy; then
+    echo "scipy is not installed. Installing scipy..."
+    conda install -y scipy
+else
+    echo "scipy is already installed."
+fi
+
+#-----------------------------------------------------------------------------#
+# Will run through munge.py script
+#-----------------------------------------------------------------------------#
+# Set working directory: 
+cd /home/bp520/rds/rds-genetics_hpc-Nl99R8pHODQ/ldsc
+
+# Sumstats 
+declare -a sst_files=(
+    "/home/bp520/rds/hpc-work/PGS_UKB/Sum_Stats/ADHD_sumstats.txt"
+    "/home/bp520/rds/hpc-work/PGS_UKB/Sum_Stats/ASD_sumstats.txt"
+    "/home/bp520/rds/hpc-work/PGS_UKB/Sum_Stats/BIP_sumstats.txt"
+    "/home/bp520/rds/hpc-work/PGS_UKB/Sum_Stats/MDD_sumstats.txt"
+    "/home/bp520/rds/hpc-work/PGS_UKB/Sum_Stats/SCZ_sumstats.txt"
+    "/home/bp520/rds/hpc-work/PGS_UKB/Sum_Stats/SUD_sumstats.txt"  
+)
+
+# N values 
+declare -a n_gwas=(
+    "225534"  # N for ADHD
+    "46350"   # N for ASD
+    "413466"  # N for BIP
+    "674452"  # N for MDD
+    "161405"  # N for SCZ
+    "1025550" # N for SUD 
+)
+
+# Define the common directory for munge output and logs, and define base_name
+outdir="/home/bp520/rds/hpc-work/Genetic_Correlation"
+
+
+for ((i=0; i<${#sst_files[@]}; i++)); do
+    /home/bp520/rds/rds-genetics_hpc-Nl99R8pHODQ/ldsc/munge_sumstats.py \
+    --sumstats "${sst_files[i]}" \
+    --N "${n_gwas[i]}" \
+    --out "${outdir}/$(basename ${sst_files[i]})" \
+    --merge-alleles w_hm3.snplist \
+    --chunksize 500000 
+done
+
+#-----------------------------------------------------------------------------#
+# Will run through ldsc.py script. Loops through each potential pairings/genetic correlations
+#-----------------------------------------------------------------------------#
+# Define the paths
+ldsc_script="/home/bp520/rds/rds-genetics_hpc-Nl99R8pHODQ/ldsc/ldsc.py"
+ld_chr="/home/bp520/rds/rds-genetics_hpc-Nl99R8pHODQ/ldsc/eur_w_ld_chr/"
+out_dir="/home/bp520/rds/hpc-work/Genetic_Correlation/LDSC_rg"
+
+# Create output directory if it doesn't exist
+mkdir -p "$out_dir"
+
+# Define the list of files
+files=(
+    "ADHD_sumstats.txt.sumstats.gz"
+    "ASD_sumstats.txt.sumstats.gz"
+    "BIP_sumstats.txt.sumstats.gz"
+    "MDD_sumstats.txt.sumstats.gz"
+    "SCZ_sumstats.txt.sumstats.gz"
+    "SUD_sumstats.txt.sumstats.gz"
+)
+
+# Loop through all combinations
+for ((i=0; i<${#files[@]}; i++)); do
+    for ((j=i+1; j<${#files[@]}; j++)); do
+        # Extract file names without extension
+        file1_name=$(basename "${files[i]}" .sumstats.gz)
+        file2_name=$(basename "${files[j]}" .sumstats.gz)
+        
+        # Construct the output file name
+        output_file="${out_dir}/${file1_name}_${file2_name}.rg"
+        
+        # Construct the command
+        command="$ldsc_script --ref-ld-chr $ld_chr --out $output_file --rg /home/bp520/rds/hpc-work/Genetic_Correlation/Munge_Files/${files[i]},/home/bp520/rds/hpc-work/Genetic_Correlation/Munge_Files/${files[j]} --w-ld-chr $ld_chr"
+        
+        # Execute the command
+        echo "Executing command: $command"
+        $command
+    done
+done
+
+#-----------------------------------------------------------------------------# 
+# Extracting the summary genetic correlation results 
+#-----------------------------------------------------------------------------#
+# Set working directory
+cd /home/bp520/rds/hpc-work/Genetic_Correlation
+
+# Directory containing the log files
+log_dir="LDSC_rg"
+
+# Output CSV file
+output_csv="genetic_correlation_summary.csv"
+
+# Write CSV header
+echo "File,p1,p2,rg,se,z,p,h2_obs,h2_obs_se,h2_int,h2_int_se,gcov_int,gcov_int_se" > "$output_csv"
+
+# Iterate through all log files
+for file in "$log_dir"/*.log; do
+    filename=$(basename "$file")
+    # Extract summary lines and append to CSV
+    summary=$(awk '/Summary of Genetic Correlation Results/{flag=1; next} /Analysis finished/{flag=0} flag' "$file" | tail -n +2)
+    if [[ -n "$summary" ]]; then
+        echo "$filename,$summary" >> "$output_csv"
+    else
+        echo "$filename,,,,,,,,,,,,," >> "$output_csv"
+    fi
+done
+
+echo "Summary lines have been extracted and written to $output_csv"
