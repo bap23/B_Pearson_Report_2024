@@ -1,0 +1,309 @@
+# Final Script to run lm for global measures for T0 and T1, extract the models, and create Data Frame/excel
+# Created on: 03/08/2024
+# Author: Bess Pearson
+# Version: 1.0 
+
+#---------------Running LM for T0-------------------
+# Set the directory path
+directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames/Final_aparc/Scaled/Scaled_ROIs_PCs/LMM"
+
+# List of specific CSV files for T0
+csv_files_T0 <- c("Processed_Scaled_Final_aparc_CT_T0.csv", 
+                  "Processed_Scaled_Final_aparc_SA_T0.csv", 
+                  "Processed_Scaled_Final_aparc_GMV_T0.csv")
+csv_files_T0 <- file.path(directory, csv_files_T0)
+print(basename(csv_files_T0))
+
+# List of PGS column names
+pgs_columns <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD")
+
+# Map phenotype to global column names
+phenotype_to_global_column <- list(
+  "CT" = "scaled_global_CT",
+  "SA" = "scaled_global_SA",
+  "GMV" = "scaled_global_GMV"
+)
+
+# Set the other covariates
+other_covariates <- c("site", "Agesquared", "Age_Sex", "Agesquared_sex", paste0("X22009.0.", 1:20), "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Function to run linear model for a specific file and PGS column
+run_lm_and_save <- function(file, pgs_columns, other_covariates, output_directory) {
+  # Extract phenotype from file name
+  file_name <- basename(file)
+  phenotype <- gsub("Processed_Scaled_Final_aparc_|_T0.csv", "", file_name)
+  
+  # Determine the global column based on phenotype
+  global_column <- phenotype_to_global_column[[phenotype]]
+  
+  # Check if the phenotype is valid
+  if (is.null(global_column)) {
+    cat("\nUnknown phenotype in file:", file_name, "\n")
+    return(NULL)
+  }
+  
+  # Read the CSV file into a dataframe
+  data <- read.csv(file)
+  
+  # Print the file being processed
+  cat("\nProcessing file:", file_name, "\n")
+  
+  # Loop through each PGS column
+  model_outputs <- list()
+  for (pgs_column in pgs_columns) {
+    # Construct the formula for linear regression with PGS using reformulate
+    formula_with_PGS <- reformulate(termlabels = c("age", pgs_column, "sex", other_covariates), response = global_column)
+    
+    # Fit the linear regression model
+    cat(paste0("\nCurrently running model for ", phenotype, ": ", paste(deparse(formula_with_PGS), collapse = " "), "\n"))
+    
+    # Fit the model with error handling
+    model_with_PGS <- try(lm(formula_with_PGS, data = data), silent = TRUE)
+    
+    # Check if the model fitting was successful
+    if (!inherits(model_with_PGS, "try-error")) {
+      cat("\nModel fitted successfully with PGS:", pgs_column, "for global measure:", global_column, "\n")
+      model_outputs[[pgs_column]] <- summary(model_with_PGS)
+    } else {
+      cat("\nError fitting model with PGS:", pgs_column, "for global measure:", global_column, "\n")
+      model_outputs[[pgs_column]] <- NA
+    }
+  }
+  
+  # Save the model outputs to a file
+  output_file <- file.path(output_directory, paste0("model_outputs_global_", phenotype, "_T0.rds"))
+  saveRDS(model_outputs, file = output_file)
+  return(model_outputs)
+}
+
+# Set the output directory for T0
+output_directory_T0 <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Run and save models for each file
+model_outputs_T0_list <- lapply(csv_files_T0, function(file) {
+  run_lm_and_save(file, pgs_columns, other_covariates, output_directory_T0)
+})
+
+#--------Checking to see if they ran: T0-----------------
+list.files(output_directory_T0, pattern = "model_outputs_global_.*_T0.rds")
+
+# Load and print model outputs for T0
+sa_model_outputs_T0 <- readRDS(file.path(output_directory_T0, "model_outputs_global_SA_T0.rds"))
+ct_model_outputs_T0 <- readRDS(file.path(output_directory_T0, "model_outputs_global_CT_T0.rds"))
+gmv_model_outputs_T0 <- readRDS(file.path(output_directory_T0, "model_outputs_global_GMV_T0.rds"))
+
+# Print summaries of some of the models
+print(names(sa_model_outputs_T0))
+print(names(ct_model_outputs_T0))
+print(names(gmv_model_outputs_T0))
+
+# Print summary of a specific model (e.g., scaled_global_SA and scaledscore_ADHD)
+print(sa_model_outputs_T0[[1]])
+print(ct_model_outputs_T0[[1]])
+print(gmv_model_outputs_T0[[1]])
+
+#---------------Running LM for T1-------------------
+# Set the directory path
+directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames/Final_aparc/Scaled/Scaled_ROIs_PCs/LMM"
+
+# List of specific CSV files for T1
+csv_files_T1 <- c("Processed_Scaled_Final_aparc_CT_T1.csv", 
+                  "Processed_Scaled_Final_aparc_SA_T1.csv", 
+                  "Processed_Scaled_Final_aparc_GMV_T1.csv")
+csv_files_T1 <- file.path(directory, csv_files_T1)
+print(basename(csv_files_T1))
+
+# List of PGS column names
+pgs_columns <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD")
+
+# Map phenotype to global column names
+phenotype_to_global_column <- list(
+  "CT" = "scaled_global_CT",
+  "SA" = "scaled_global_SA",
+  "GMV" = "scaled_global_GMV"
+)
+
+# Set the other covariates
+other_covariates <- c("site", "Agesquared", "Age_Sex", "Agesquared_sex", paste0("X22009.0.", 1:20), "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Function to run linear model for a specific file and PGS column
+run_lm_and_save <- function(file, pgs_columns, other_covariates, output_directory) {
+  # Extract phenotype from file name
+  file_name <- basename(file)
+  phenotype <- gsub("Processed_Scaled_Final_aparc_|_T1.csv", "", file_name)
+  
+  # Determine the global column based on phenotype
+  global_column <- phenotype_to_global_column[[phenotype]]
+  
+  # Check if the phenotype is valid
+  if (is.null(global_column)) {
+    cat("\nUnknown phenotype in file:", file_name, "\n")
+    return(NULL)
+  }
+  
+  # Read the CSV file into a dataframe
+  data <- read.csv(file)
+  
+  # Print the file being processed
+  cat("\nProcessing file:", file_name, "\n")
+  
+  # Loop through each PGS column
+  model_outputs <- list()
+  for (pgs_column in pgs_columns) {
+    # Construct the formula for linear regression with PGS using reformulate
+    formula_with_PGS <- reformulate(termlabels = c("age", pgs_column, "sex", other_covariates), response = global_column)
+    
+    # Fit the linear regression model
+    cat(paste0("\nCurrently running model for ", phenotype, ": ", paste(deparse(formula_with_PGS), collapse = " "), "\n"))
+    
+    # Fit the model with error handling
+    model_with_PGS <- try(lm(formula_with_PGS, data = data), silent = TRUE)
+    
+    # Check if the model fitting was successful
+    if (!inherits(model_with_PGS, "try-error")) {
+      cat("\nModel fitted successfully with PGS:", pgs_column, "for global measure:", global_column, "\n")
+      model_outputs[[pgs_column]] <- summary(model_with_PGS)
+    } else {
+      cat("\nError fitting model with PGS:", pgs_column, "for global measure:", global_column, "\n")
+      model_outputs[[pgs_column]] <- NA
+    }
+  }
+  
+  # Save the model outputs to a file
+  output_file <- file.path(output_directory, paste0("model_outputs_global_", phenotype, "_T1.rds"))
+  saveRDS(model_outputs, file = output_file)
+  return(model_outputs)
+}
+
+# Set the output directory for T1
+output_directory_T1 <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Run and save models for each file
+model_outputs_T1_list <- lapply(csv_files_T1, function(file) {
+  run_lm_and_save(file, pgs_columns, other_covariates, output_directory_T1)
+})
+
+#--------Checking to see if they ran: T1-----------------
+list.files(output_directory_T1, pattern = "model_outputs_global_.*_T1.rds")
+
+# Load and print model outputs for T1
+sa_model_outputs_T1 <- readRDS(file.path(output_directory_T1, "model_outputs_global_SA_T1.rds"))
+ct_model_outputs_T1 <- readRDS(file.path(output_directory_T1, "model_outputs_global_CT_T1.rds"))
+gmv_model_outputs_T1 <- readRDS(file.path(output_directory_T1, "model_outputs_global_GMV_T1.rds"))
+
+# Print summaries of some of the models
+print(names(sa_model_outputs_T1))
+print(names(ct_model_outputs_T1))
+print(names(gmv_model_outputs_T1))
+
+# Print summary of a specific model (e.g., scaled_global_SA and scaledscore_ADHD)
+print(sa_model_outputs_T1[[1]])
+print(ct_model_outputs_T1[[1]])
+print(gmv_model_outputs_T1[[1]])
+
+#---------------Extraction-------------------
+extraction_directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Set the p-value threshold
+p_value_threshold <- 0.0000977
+
+# Load model outputs
+ct_model_outputs_T0 <- readRDS(file.path(extraction_directory, "model_outputs_global_CT_T0.rds"))
+sa_model_outputs_T0 <- readRDS(file.path(extraction_directory, "model_outputs_global_SA_T0.rds"))
+gmv_model_outputs_T0 <- readRDS(file.path(extraction_directory, "model_outputs_global_GMV_T0.rds"))
+ct_model_outputs_T1 <- readRDS(file.path(extraction_directory, "model_outputs_global_CT_T1.rds"))
+sa_model_outputs_T1 <- readRDS(file.path(extraction_directory, "model_outputs_global_SA_T1.rds"))
+gmv_model_outputs_T1 <- readRDS(file.path(extraction_directory, "model_outputs_global_GMV_T1.rds"))
+
+# Define the function to process model outputs
+process_model_outputs <- function(model_outputs, output_file_name) {
+  # Create an empty list to store results
+  output_list <- list()
+  
+  # Loop through each element in the model outputs
+  for (i in seq_along(model_outputs)) {
+    # Get the names of coefficients with the prefix "scaledscore_"
+    scaledscore_vars <- grep("^scaledscore_", rownames(model_outputs[[i]]$coefficients), value = TRUE)
+    
+    # Loop through each scaledscore variable
+    for (scaledscore_var in scaledscore_vars) {
+      # Extract coefficients for the current scaledscore variable
+      estimate <- model_outputs[[i]]$coefficients[scaledscore_var, "Estimate"]
+      std_error <- model_outputs[[i]]$coefficients[scaledscore_var, "Std. Error"]
+      t_value <- model_outputs[[i]]$coefficients[scaledscore_var, "t value"]
+      p_value <- model_outputs[[i]]$coefficients[scaledscore_var, "Pr(>|t|)"]
+      
+      # Extract PGS name from element name
+      element_name <- names(model_outputs)[i]
+      PGS <- gsub("^.*_scaledscore_", "", element_name)
+      
+      # Create a data frame for the current scaledscore variable
+      output_df <- data.frame(
+        PGS = PGS,
+        Estimate = estimate,
+        Std_Error = std_error,
+        t_value = t_value,
+        P_Value = p_value,
+        Significant_P_Value = ifelse(p_value < p_value_threshold, "sig", "not sig")
+      )
+      
+      # Append the data frame to the list
+      output_list[[length(output_list) + 1]] <- output_df
+    }
+  }
+  
+  # Combine all data frames in the list into a single data frame
+  combined_output_df <- do.call(rbind, output_list)
+  
+  # Print the combined data frame
+  print(combined_output_df)
+  
+  # Save the combined data frame to a CSV file in the specified directory
+  write.csv(combined_output_df, file.path(output_directory, output_file_name), row.names = FALSE)
+}
+
+# Set output directory
+output_directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs"
+
+# Process T0 model outputs
+process_model_outputs(ct_model_outputs_T0, "CT_UKB_LMM_T0_global.csv")
+process_model_outputs(sa_model_outputs_T0, "SA_UKB_LMM_T0_global.csv")
+process_model_outputs(gmv_model_outputs_T0, "GMV_UKB_LMM_T0_global.csv")
+
+# Process T1 model outputs
+process_model_outputs(ct_model_outputs_T1, "CT_UKB_LMM_T1_global.csv")
+process_model_outputs(sa_model_outputs_T1, "SA_UKB_LMM_T1_global.csv")
+process_model_outputs(gmv_model_outputs_T1, "GMV_UKB_LMM_T1_global.csv")
+
+#---------------Combine all three (CT, SA, GMV)---------------------------
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs")
+
+# Read CSV files into separate data frames
+ct_t0_g <- read.csv("CT_UKB_LMM_T0_global.csv")
+ct_t1_g <- read.csv("CT_UKB_LMM_T1_global.csv")
+sa_t0_g <- read.csv("SA_UKB_LMM_T0_global.csv")
+sa_t1_g <- read.csv("SA_UKB_LMM_T1_global.csv")
+gmv_t0_g <- read.csv("GMV_UKB_LMM_T0_global.csv")
+gmv_t1_g <- read.csv("GMV_UKB_LMM_T1_global.csv")
+
+# Add a Phenotype column to each data frame
+ct_t0_g$Phenotype <- "CT"
+ct_t1_g$Phenotype <- "CT"
+sa_t0_g$Phenotype <- "SA"
+sa_t1_g$Phenotype <- "SA"
+gmv_t0_g$Phenotype <- "GMV"
+gmv_t1_g$Phenotype <- "GMV"
+
+# Add a Timepoint column to each data frame
+ct_t0_g$Timepoint <- "T0"
+ct_t1_g$Timepoint <- "T1"
+sa_t0_g$Timepoint <- "T0"
+sa_t1_g$Timepoint <- "T1"
+gmv_t0_g$Timepoint <- "T0"
+gmv_t1_g$Timepoint <- "T1"
+
+# Combine all data frames into a single data frame
+all_phenotypes_df <- rbind(ct_t0_g, ct_t1_g, sa_t0_g, sa_t1_g, gmv_t0_g, gmv_t1_g)
+
+# Save the combined data frame to a CSV file
+write.csv(all_phenotypes_df, file = "All_Phenotypes_UKB_LMM_Final_Global.csv", row.names = FALSE)
