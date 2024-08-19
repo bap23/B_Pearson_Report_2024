@@ -1,0 +1,65 @@
+# Script to assess the relationship between PGS and the number of repeated measurements via log regression
+# Created on: 05/08/2024
+# Author: Bess Pearson
+
+# Load necessary packages
+library(dplyr)
+library(openxlsx)
+
+# Set working directory
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames") 
+
+# Load data
+df <- read.csv("Logistic_Reg_DF.csv")
+str(df)
+
+# Create the num_time_points variable
+df <- df %>%
+  group_by(Subject) %>%
+  mutate(num_time_points = case_when(
+    length(unique(eventnum)) == 2 ~ 1,  # 2 scans
+    length(unique(eventnum)) == 1 ~ 0,  # 1 scan
+    TRUE ~ NA_real_
+  )) %>%
+  ungroup() %>%
+  filter(num_time_points %in% c(0, 1))  # Keep only those with 1 or 2 scans
+
+# Count the number of participants with 1 scan and 2 scans
+count_table <- df %>%
+  distinct(Subject, num_time_points) %>%  # Ensure we count each subject only once
+  count(num_time_points)
+
+# Print the count table
+print(count_table)
+# num_time_points     n
+#             0    30569
+#             1    1210
+
+# Define outcome and predictor variables
+outcome_var <- "num_time_points"
+predictor_vars <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD",
+                    "age", "sex", "Agesquared", "Age_Sex", "Agesquared_sex", "X22009.0.1", "X22009.0.2", "X22009.0.3", "X22009.0.4",
+                    "X22009.0.5", "X22009.0.6", "X22009.0.7", "X22009.0.8", "X22009.0.9", "X22009.0.10", "X22009.0.11", "X22009.0.12",
+                    "X22009.0.13", "X22009.0.14", "X22009.0.15", "X22009.0.16", "X22009.0.17", "X22009.0.18", "X22009.0.19", "X22009.0.20",
+                    "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Select relevant columns from df
+df_selected <- df %>%
+  select(all_of(c("Subject", "num_time_points", predictor_vars)))
+
+# Ensure `num_time_points` is a factor
+df_selected$num_time_points <- as.factor(df_selected$num_time_points)
+
+# Fit logistic regression model
+log_reg <- glm(num_time_points ~ ., data = df_selected[, c(outcome_var, predictor_vars)], family = binomial)
+
+# Print summary of the model
+summary(log_reg)
+
+# Save the summary stats to an Excel file
+wb <- createWorkbook()
+sheet_name <- "Logistic_Regression_Results"
+addWorksheet(wb, sheet_name)
+writeData(wb, sheet = sheet_name, x = coef(summary(log_reg)), rowNames = TRUE)
+output_path <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/Attrition_Bias/logistic_regression_results.xlsx"
+saveWorkbook(wb, file = output_path, overwrite = TRUE)
