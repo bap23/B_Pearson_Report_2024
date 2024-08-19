@@ -1,0 +1,416 @@
+# Final Script to run linear mixed effects model (lmer), extract the models, and create DataFrame for further visualizaiton
+# Created on: 14/07/2024
+# Author: Bess Pearson
+# Version: 1.0 
+
+# Load necessary libraries
+library(dplyr)
+library(lme4)
+library(tidyr)
+
+# Set the directory path
+directory <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/DataFrames/Final_aparc/Scaled/Scaled_ROIs_PCs/LMER"
+
+#---------------Running LMER-------------------
+#------ Script: run_SA_models.R-------------
+# Define specific CSV file for SA
+csv_file <- "Processed_Scaled_Final_aparc_SA_LMER.csv"
+csv_file_path <- file.path(directory, csv_file)
+
+# Define fixed effects (including PGS)
+age <- "age"
+pgs_columns <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD")
+sex <- "sex"
+other_covariates <- c("site", paste0("X22009.0.", 1:20), "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Define random effect
+random_effect <- "(1|Subject)"
+
+# Set the output directory
+output_directory_lmer <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER"
+
+# Function to run linear models and save results
+run_lm_and_save <- function(file, type, output_directory) {
+  model_outputs <- list()
+  
+  # Read the CSV file into a dataframe
+  data <- read.csv(file)
+  
+  # Print the file being processed
+  cat("\nData from file:", basename(file), "\n")
+  
+  # Loop through each brain region column
+  for (brain_region in grep("^lh_|^rh_", names(data), value = TRUE)) {
+    
+    # Loop through each PGS column
+    for (pgs_column in pgs_columns) {
+      
+      # Construct formula for linear mixed-effects model
+      formula_string <- paste0(brain_region, " ~ ", random_effect, " + ", age, " * ", pgs_column, " + ", sex, " + ", paste(other_covariates, collapse = " + "))
+      formula_with_PGS <- as.formula(formula_string)
+      print(formula_with_PGS) # To check formula
+      
+      # Fit the linear regression model
+      cat(paste0("\nCurrently running model for: ", paste(deparse(formula_with_PGS), collapse = " "), "\n"))
+      
+      # Fit the model with error handling
+      model_with_PGS <- try(lmer(formula_with_PGS, data = data), silent = TRUE)
+      
+      # Check if the model fitting was successful
+      if (!inherits(model_with_PGS, "try-error")) {
+        cat("\nSummary of the model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+        print(summary(model_with_PGS))
+        model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- summary(model_with_PGS)
+      } else {
+        cat("\nError fitting model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+        model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- NA
+      }
+    }
+  }
+  
+  # Save the model outputs to a file in the specified output directory
+  saveRDS(model_outputs, file = file.path(output_directory, paste0(type, "_model_outputs.rds")))
+  return(model_outputs)
+}
+
+# Run the models and save outputs for SA data
+sa_model_outputs <- run_lm_and_save(csv_file_path, "SA", output_directory_lmer)
+
+#------ Script: run_CT_models.R-------------
+# Define specific CSV file for CT
+csv_file <- "Processed_Scaled_Final_aparc_CT_LMER.csv"
+csv_file_path <- file.path(directory, csv_file)
+
+# Define fixed effects (including PGS)
+age <- "age"
+pgs_columns <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD")
+sex <- "sex"
+other_covariates <- c("site", paste0("X22009.0.", 1:20), "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Define random effect
+random_effect <- "(1|Subject)"
+
+# Set the output directory
+output_directory_lmer <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER"
+
+# Function to run linear models and save results
+run_lm_and_save <- function(file, type, output_directory) {
+  model_outputs <- list()
+  
+  # Read the CSV file into a dataframe
+  data <- read.csv(file)
+  
+  # Print the file being processed
+  cat("\nData from file:", basename(file), "\n")
+  
+  # Loop through each brain region column
+  for (brain_region in grep("^lh_|^rh_", names(data), value = TRUE)) {
+    
+    # Loop through each PGS column
+    for (pgs_column in pgs_columns) {
+      
+      # Construct formula for linear mixed-effects model
+      formula_string <- paste0(brain_region, " ~ ", random_effect, " + ", age, " * ", pgs_column, " + ", sex, " + ", paste(other_covariates, collapse = " + "))
+      formula_with_PGS <- as.formula(formula_string)
+      print(formula_with_PGS) # To check formula
+      
+      # Fit the linear regression model
+      cat(paste0("\nCurrently running model for: ", paste(deparse(formula_with_PGS), collapse = " "), "\n"))
+      
+      # Fit the model with error handling
+      model_with_PGS <- try(lmer(formula_with_PGS, data = data), silent = TRUE)
+      
+      # Check if the model fitting was successful
+      if (!inherits(model_with_PGS, "try-error")) {
+        cat("\nSummary of the model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+        print(summary(model_with_PGS))
+        model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- summary(model_with_PGS)
+      } else {
+        cat("\nError fitting model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+        model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- NA
+      }
+    }
+  }
+  
+  # Save the model outputs to a file in the specified output directory
+  saveRDS(model_outputs, file = file.path(output_directory, paste0(type, "_model_outputs.rds")))
+  return(model_outputs)
+}
+
+# Run the models and save outputs for CT data
+ct_model_outputs <- run_lm_and_save(csv_file_path, "CT", output_directory_lmer)
+
+#------ Script: run_GMV_models.R-------------
+# Define specific CSV file for GMV
+csv_file <- "Processed_Scaled_Final_aparc_GMV_LMER.csv"
+csv_file_path <- file.path(directory, csv_file)
+
+# Define fixed effects (including PGS)
+age <- "age"
+pgs_columns <- c("scaledscore_ADHD", "scaledscore_ASD", "scaledscore_BIP", "scaledscore_MDD", "scaledscore_SCZ", "scaledscore_SUD")
+sex <- "sex"
+other_covariates <- c("site", paste0("X22009.0.", 1:20), "eulerleftplusright", "fd", "fd_max", "Covar")
+
+# Define random effect
+random_effect <- "(1|Subject)"
+
+# Set the output directory
+output_directory_lmer <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER"
+
+# Function to run linear models and save results
+run_lm_and_save <- function(file, type, output_directory) {
+  model_outputs <- list()
+  
+  # Read the CSV file into a dataframe
+  data <- read.csv(file)
+  
+  # Print the file being processed
+  cat("\nData from file:", basename(file), "\n")
+  
+  # Loop through each brain region column
+  for (brain_region in grep("^lh_|^rh_", names(data), value = TRUE)) {
+    
+    # Loop through each PGS column
+    for (pgs_column in pgs_columns) {
+      
+      # Construct formula for linear mixed-effects model
+      formula_string <- paste0(brain_region, " ~ ", random_effect, " + ", age, " * ", pgs_column, " + ", sex, " + ", paste(other_covariates, collapse = " + "))
+      formula_with_PGS <- as.formula(formula_string)
+      print(formula_with_PGS) # To check formula
+      
+      # Fit the linear regression model
+      cat(paste0("\nCurrently running model for: ", paste(deparse(formula_with_PGS), collapse = " "), "\n"))
+      
+      # Fit the model with error handling
+      model_with_PGS <- try(lmer(formula_with_PGS, data = data), silent = TRUE)
+      
+      # Check if the model fitting was successful
+      if (!inherits(model_with_PGS, "try-error")) {
+        cat("\nSummary of the model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+        print(summary(model_with_PGS))
+        model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- summary(model_with_PGS)
+      } else {
+        cat("\nError fitting model with PGS:", pgs_column, "for brain region:", brain_region, "\n")
+        model_outputs[[paste(brain_region, pgs_column, sep = "_")]] <- NA
+      }
+    }
+  }
+  
+  # Save the model outputs to a file in the specified output directory
+  saveRDS(model_outputs, file = file.path(output_directory, paste0(type, "_model_outputs.rds")))
+  return(model_outputs)
+}
+
+# Run the models and save outputs for GMV data
+gmv_model_outputs <- run_lm_and_save(csv_file_path, "GMV", output_directory_lmer)
+
+#--------Checking to see if they ran-----------------
+list.files(output_directory_lmer, pattern = "model_outputs.rds")
+# [1] "CT_model_outputs.rds"  "GMV_model_outputs.rds" "SA_model_outputs.rds" 
+
+# Load the saved model outputs
+sa_model_outputs <- readRDS(file.path(output_directory_lmer, "SA_model_outputs.rds"))
+ct_model_outputs <- readRDS(file.path(output_directory_lmer, "CT_model_outputs.rds"))
+gmv_model_outputs <- readRDS(file.path(output_directory_lmer, "GMV_model_outputs.rds"))
+
+# Print summaries of some of the models (Should have 408 (68 regions * 6 conditions))
+print(names(sa_model_outputs))
+print(names(ct_model_outputs))
+print(names(gmv_model_outputs))
+
+# Print summary of a specific model (e.g. - lh_bankssts and scaledscore_ADHD)
+print(sa_model_outputs[[1]])
+print(ct_model_outputs[[1]])
+print(gmv_model_outputs[[1]])
+
+#---------------Extraction---------------------------
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER")
+
+output_directory_lmer <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER"
+
+sa_model_outputs <- readRDS(file.path(output_directory_lmer, "SA_model_outputs.rds"))
+ct_model_outputs <- readRDS(file.path(output_directory_lmer, "CT_model_outputs.rds"))
+gmv_model_outputs <- readRDS(file.path(output_directory_lmer, "GMV_model_outputs.rds"))
+
+# Define the function to process model outputs
+process_model_outputs <- function(model_outputs, output_file_name) {
+  # Create an empty list to store results
+  output_list <- list()
+  
+  # Loop through each element in model_outputs
+  for (i in seq_along(model_outputs)) {
+    # Get the names of coefficients with the prefix "scaledscore_" or "age:scaledscore_"
+    scaledscore_vars <- grep("^(scaledscore_|age:scaledscore_)", rownames(model_outputs[[i]]$coefficients), value = TRUE)
+    
+    # Initialize variables to store estimates and other statistics
+    estimate_score <- NA
+    std_error_score <- NA
+    t_value_score <- NA
+    p_value_score <- NA
+    
+    estimate_interaction <- NA
+    std_error_interaction <- NA
+    t_value_interaction <- NA
+    p_value_interaction <- NA
+    
+    # Loop through each scaledscore variable
+    for (scaledscore_var in scaledscore_vars) {
+      # Extract coefficients for the current scaledscore variable
+      estimate <- model_outputs[[i]]$coefficients[scaledscore_var, "Estimate"]
+      std_error <- model_outputs[[i]]$coefficients[scaledscore_var, "Std. Error"]
+      t_value <- model_outputs[[i]]$coefficients[scaledscore_var, "t value"]
+      
+      # Calculate the p-value
+      p_value <- 2 * pnorm(abs(t_value), lower.tail = FALSE)
+      
+      # Check if the current variable is the main effect or interaction term
+      if (grepl("^scaledscore_", scaledscore_var)) {
+        estimate_score <- estimate
+        std_error_score <- std_error
+        t_value_score <- t_value
+        p_value_score <- p_value
+      } else if (grepl("^age:scaledscore_", scaledscore_var)) {
+        estimate_interaction <- estimate
+        std_error_interaction <- std_error
+        t_value_interaction <- t_value
+        p_value_interaction <- p_value
+      }
+    }
+    
+    # Extract brain region and PGS name from element name
+    element_name <- names(model_outputs)[i]
+    Brain_Region <- gsub("_scaledscore_.*", "", element_name)
+    PGS <- gsub("^.*_scaledscore_", "", element_name)
+    
+    # Create a data frame for the current element
+    output_df <- data.frame(
+      Brain_Region = Brain_Region,
+      PGS = PGS,
+      Estimate_Score = estimate_score,
+      Std_Error_Score = std_error_score,
+      t_value_Score = t_value_score,
+      p_value_Score = p_value_score,
+      Significant_p_value_Score = ifelse(p_value_score < 0.05, "sig", "not sig"),
+      Estimate_Interaction = estimate_interaction,
+      Std_Error_Interaction = std_error_interaction,
+      t_value_Interaction = t_value_interaction,
+      p_value_Interaction = p_value_interaction,
+      Significant_p_value_Interaction = ifelse(p_value_interaction < 0.05, "sig", "not sig")
+    )
+    
+    # Append the data frame to the list
+    output_list[[length(output_list) + 1]] <- output_df
+  }
+  
+  # Combine all data frames in the list into a single data frame
+  combined_output_df <- do.call(rbind, output_list)
+  
+  # Save the combined data frame to a CSV file in the specified directory
+  write.csv(combined_output_df, file.path(output_directory_lmer, output_file_name), row.names = FALSE)
+}
+
+# Process model outputs
+process_model_outputs(ct_model_outputs, "CT_UKB_LMER.csv")
+process_model_outputs(sa_model_outputs, "SA_UKB_LMER.csv")
+process_model_outputs(gmv_model_outputs, "GMV_UKB_LMER.csv")
+
+#---------------Combine all three (CT, SA, GMV), add DK region, and adding left or right hemi---------------------------
+# Read each CSV file into a data frame
+CT_df <- read.csv("CT_UKB_LMER.csv")
+SA_df <- read.csv("SA_UKB_LMER.csv")
+GMV_df <- read.csv("GMV_UKB_LMER.csv")
+
+# Add a Phenotype column to each data frame
+CT_df$Phenotype <- "CT"
+SA_df$Phenotype <- "SA"
+GMV_df$Phenotype <- "GMV"
+
+# Combine all data frames into a single data frame
+all_phenotypes_df <- rbind(CT_df, SA_df, GMV_df)
+
+# Split the Brain_Region column into Hemisphere and Region
+all_phenotypes_df_hemi <- all_phenotypes_df %>%
+  separate(Brain_Region, into = c("Hemisphere", "Region"), sep = "_", remove = FALSE) %>%
+  mutate(Hemisphere = ifelse(Hemisphere == "lh", "left", 
+                             ifelse(Hemisphere == "rh", "right", Hemisphere)))
+
+# Now changing the Region column, to fit the dk atlas
+dk_regions <- unique(ggseg::dk$data$region)
+unique_regions <- unique(all_phenotypes_df_hemi$Region)
+print(unique_regions)
+
+region_mapping <- c(
+  "banssts" = "bankssts",
+  "caudalanteriorcingulate" = "caudal anterior cingulate",
+  "caudalmiddlefrontal" = "caudal middle frontal",
+  "cuneus" = "cuneus",
+  "entorhinal" = "entorhinal",
+  "fusiform" = "fusiform",
+  "inferiorparietal" = "inferior parietal",
+  "inferiortemporal" = "inferior temporal",
+  "isthmuscingulate" = "isthmus cingulate",
+  "lateraloccipital" = "lateral occipital",
+  "lateralorbitofrontal" = "lateral orbitofrontal",
+  "lingual" = "lingual",
+  "medialorbitofrontal" = "medial orbitofrontal",
+  "middletemporal" = "middle temporal",
+  "parahippocampal" = "parahippocampal",
+  "paracentral" = "paracentral",
+  "parsopercularis" = "pars opercularis",
+  "parsorbitalis" = "pars orbitalis",
+  "parstriangularis" = "pars triangularis",
+  "pericalcarine" = "pericalcarine",
+  "postcentral" = "postcentral",
+  "posteriorcingulate" = "posterior cingulate",
+  "precentral" = "precentral",
+  "precuneus" = "precuneus",
+  "rostralanteriorcingulate" = "rostral anterior cingulate",
+  "rostralmiddlefrontal" = "rostral middle frontal",
+  "superiorfrontal" = "superior frontal",
+  "superiorparietal" = "superior parietal",
+  "superiortemporal" = "superior temporal",
+  "supramarginal" = "supramarginal",
+  "frontalpole" = "frontal pole",
+  "temporalpole" = "temporal pole",
+  "transversetemporal" = "transverse temporal",
+  "insula" = "insula"
+)
+
+map_region <- function(region) {
+  ifelse(region %in% names(region_mapping), region_mapping[region], region)
+}
+
+# Apply region mapping
+all_phenotypes_df_final <- all_phenotypes_df_hemi %>%
+  mutate(Region = map_region(Region))
+
+# Change the Brain_Region column to label
+all_phenotypes_df_final <- all_phenotypes_df_final %>%
+  rename(label = Brain_Region)
+
+# Save the combined data frame to a CSV file
+write.csv(all_phenotypes_df_final, file = "All_Phenotypes_UKB_LMER_Final.csv", row.names = FALSE)
+
+#---------------Extract only the ones that were sig from LMM---------------------------
+# Set working directory
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMER/Outputs_LMER")
+
+# Read sig_lmm and all_phenotypes
+sig_lmm <- read.table("Sig_LMM_UKB.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+all_phenotypes <- read.csv("All_Phenotypes_UKB_LMER_Final.csv", stringsAsFactors = FALSE)
+
+# Ensure unique combinations in sig_lmm
+sig_lmm_unique <- unique(sig_lmm)
+
+# Create a composite key for both sig_lmm_unique and all_phenotypes including the hemisphere
+sig_lmm_unique$composite_key <- paste(sig_lmm_unique$Region, sig_lmm_unique$Hemi, sig_lmm_unique$PGS, sig_lmm_unique$Phenotype)
+all_phenotypes$composite_key <- paste(all_phenotypes$Region, all_phenotypes$Hemisphere, all_phenotypes$PGS, all_phenotypes$Phenotype)
+
+# Subset all_phenotypes based on the composite keys in sig_lmm
+final_data <- all_phenotypes[all_phenotypes$composite_key %in% sig_lmm_unique$composite_key, ]
+
+# Remove the composite_key column from the final data
+final_data <- final_data[, !(names(final_data) %in% "composite_key")]
+
+# Write final_data to Final_UKB_LMER.csv
+write.csv(final_data, file = "Final_UKB_LMER.csv", row.names = FALSE)
