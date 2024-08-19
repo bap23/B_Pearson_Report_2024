@@ -1,0 +1,176 @@
+#!/bin/bash
+
+######
+# Transform the parcellation from standard space and obtain parcellations in native space.
+# Created by: Rafael Romero Garcia - rr480@cam.ac.uk
+# University of Cambridge 2017
+# Edited by: S. Orellana - sdco2@cam.ac.uk (2023)
+# Adapted by: Bess Pearson
+# WARNING: this script deletes any existing files created in a previous attempt to parcellate specified parcellations before computing them again.
+#####
+
+#====================================================================
+# load modules
+#====================================================================
+. /etc/profile.d/modules.sh                # Leave this line (enables the module command)
+module purge                               # Removes all modules still loaded
+module load rhel8/default-icl              # if submitting to icelake
+module load freesurfer/7.1.0
+module load matlab/r2019b
+
+#====================================================================
+# Specify parameters
+#====================================================================
+#1. Subject
+sub=$1 
+
+#2. Second parameter is the folder with the study's imaging data
+dataDir=$2
+
+#3. Third parameter is the name of the folder of the assessment/wave of imaging data to process
+assessment=$3
+
+#4. Arm
+arm=$4
+
+#5. Meta-directory: Where your logs & code are located
+metaDir=$5
+
+#Checks of submission
+if [[ ! -d ${dataDir} ]]; then
+    echo "**** STUDY DIRECTORY does not exist ****"
+fi
+
+if [[ -z ${sub} ]]; then
+    echo "**** No subject ID given ****"
+fi
+
+if [[ -z ${assessment} ]]; then
+    echo "**** No assessment time given ****"
+fi
+
+#====================================================================
+# SET UP USEFUL VARIABLES
+#====================================================================
+# MAKE PARCELLATION DIRECTORY
+mkdir -p ${dataDir}/${sub}/${assessment}/surfaces/${sub}/parcellation/
+
+# SURFACES DIRECTORY (It must be called SUBJECTS_DIR for fs to find)
+SUBJECTS_DIR=${dataDir}/${sub}/${assessment}/surfaces
+
+# AVERAGE SURFACE DIRECTORY
+fsaverage_subid=fsaverage
+fsaverage_path=/home/bp520/rds/hpc-work/software/freesurfer/subjects/${fsaverage_subid}/
+
+# CentOS 8
+# wget https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/7.1.1/freesurfer-linux-centos8_x86_64-7.1.1.tar.gz
+# tar -zxvf freesurfer-linux-centos8_x86_64-7.1.1.tar.gz
+
+# Create a simbolic link to the fsaverage inside the locally installed version of freesurfer
+# A. Remove link if already there
+if [ -d ${SUBJECTS_DIR}/$fsaverage_subid/ ] || [ -f ${SUBJECTS_DIR}/$fsaverage_subid/ ]; then
+	rm ${SUBJECTS_DIR}/$fsaverage_subid
+fi
+
+# B. Create it
+chmod -R 775 $SUBJECTS_DIR
+cd $SUBJECTS_DIR
+ln -s $fsaverage_path ${SUBJECTS_DIR}/$fsaverage_subid
+
+#====================================================================
+# TRANSFORM PARCELLATIONS
+#====================================================================
+#NOTE: -s flag to determine if file does not exist OR is empty
+
+if [ -f ${SUBJECTS_DIR}/${sub}/label/rh.aparc.annot ] && [ ! "${sub}" = 'fsaverage' ]; then
+	echo  "*** Transforming the directory ***:" ${SUBJECTS_DIR}/${sub}/
+
+
+	#for parcellation in economo Schaefer_200 Schaefer_400 500_sym.aparc 500.aparc sjh PALS_B12_Lobes aparc HCP.fsaverage.aparc ; do 
+	#for parcellation in economo 500_sym.aparc 500.aparc aparc HCP.fsaverage.aparc ; do 
+	for parcellation in aparc HCP.fsaverage.aparc ; do 
+		echo "    Transforming ${parcellation} parcellation"
+
+		#=================== PERFORM PARCELLATION ====================================
+		#NOTE: Outputs from these functions end up in
+			#${SUBJECTS_DIR}/${sub}/label/
+			#${SUBJECTS_DIR}/${sub}/parcellation/
+
+		#1. =================== Create the surface parcellations in subject space 
+		# Loop through both hemispheres
+		for hemi in lh rh ; do
+			# Check if output file already exists
+			if [ ! -s ${SUBJECTS_DIR}/${sub}/label/${hemi}.${parcellation}.annot ]; then
+				# If it exists, delete the file
+    			rm "${SUBJECTS_DIR}/${sub}/label/${hemi}.${parcellation}.annot"
+			fi
+
+			echo "        Creating ${hemi} ${parcellation} surface in subject space"
+				# Transform the surface parcellation from fsaverage space
+            	# to indiviual native space
+				mri_surf2surf --srcsubject ${fsaverage_subid} \
+				            --sval-annot ${SUBJECTS_DIR}/${fsaverage_subid}/label/${hemi}.${parcellation}\
+				            --trgsubject ${sub} \
+				            --trgsurfval ${SUBJECTS_DIR}/${sub}/label/${hemi}.${parcellation} \
+				            --hemi ${hemi}
+
+		done
+
+		#2. =================== individual surf parcellation to volume 
+		# Check to see if volume parcellation file already exists
+		if [ ! -s ${SUBJECTS_DIR}/${sub}/parcellation/${parcellation}.nii.gz ]; then
+			# If it exists, delete the file
+			rm "${SUBJECTS_DIR}/${sub}/parcellation/${parcellation}.nii.gz"
+		fi
+			echo "        Creating ${parcellation} volume in subject space"
+			 # Transform indivual surface parcellation to individual volume parcellation
+			mkdir -p ${SUBJECTS_DIR}/${sub}/parcellation/
+			mri_aparc2aseg --s ${sub} \
+                        	--o ${SUBJECTS_DIR}/${sub}/parcellation/${parcellation}.nii.gz \
+                        	--annot ${parcellation} \
+                        	--rip-unknown \
+                        	--hypo-as-wm
+
+
+
+		#3. =================== Renumber volume parcellation
+		
+		 # Check to see if renumbered volume parcellation file already exists
+		if [ ! -s ${SUBJECTS_DIR}/${sub}/parcellation/${parcellation}_seq.nii.gz ]; then
+			# If it exists, delete the file
+			rm "${SUBJECTS_DIR}/${sub}/parcellation/${parcellation}_seq.nii.gz"
+		fi
+			echo "		Renumbering ${parcellation} volume"
+			# Define the path to the scripts
+			scripts_path=${metaDir}/code
+			# Use the path in the MATLAB command
+			matlab -nodisplay -r "addpath('${scripts_path}'); renumDesikan_sub('${SUBJECTS_DIR}/${sub}/parcellation/${parcellation}.nii.gz',1);exit"
+
+		#===================OBTAIN FREESURFER TABULAR OUTPUTS ====================================
+		#NOTE: Outputs from these functions end up in  {SUBJECTS_DIR}/${sub}/stats/
+
+		for hemi in lh rh ; do
+
+			#A. =================== Obtain surface parcellation values
+			
+			if [ ! -s ${SUBJECTS_DIR}/${sub}/stats/${hemi}.${parcellation}.log ]; then
+				rm "${SUBJECTS_DIR}/${sub}/stats/${hemi}.${parcellation}.log"
+			fi
+				echo "		Obtaining surface stats (e.g CT) for ${parcellation}"
+				mris_anatomical_stats -a ${SUBJECTS_DIR}/${sub}/label/${hemi}.${parcellation}.annot -b ${sub} ${hemi} > ${SUBJECTS_DIR}/${sub}/stats/${hemi}.${parcellation}.log
+
+			#B. =================== Obtain surface volume values
+			echo "		Obtaining VOLUME stats for ${parcellation}"
+			if [ ! -s ${SUBJECTS_DIR}/${sub}/stats/${hemi}_${parcellation}.w-g.pct.stats ]; then
+				rm "${SUBJECTS_DIR}/${sub}/stats/${hemi}_${parcellation}.w-g.pct.stats"
+			fi
+				echo "		Obtaining VOLUME stats for ${parcellation}"
+				mri_segstats --in ${SUBJECTS_DIR}/${sub}/surf/${hemi}.w-g.pct.mgh --annot ${sub} ${hemi} ${parcellation} --sum ${SUBJECTS_DIR}/${sub}/stats/${hemi}_${parcellation}.w-g.pct.stats --snr
+		
+		done
+
+	done
+fi
+
+#remove simbolic link
+rm ${SUBJECTS_DIR}/$fsaverage_subid
