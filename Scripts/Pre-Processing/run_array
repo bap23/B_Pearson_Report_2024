@@ -1,0 +1,61 @@
+#!/bin/bash
+
+#====================================================================
+# Specify parameters for each BATCH script.
+#====================================================================
+#1. List of subjects to iterate through
+sublist=$1
+
+#2. BIDS directory - not tied to metaDir just in case.
+dataDir=$2
+
+#3. Wave and assessment
+assessment=$3
+
+#4. ARM // Ocassionally differently specified per wave
+arm=$4
+
+#5. Meta-directory: Where your logs & code are located
+metaDir=$5
+
+#6. How long is the length of subjects being considered?
+block_length=$6
+
+#7.Block: segment of subjects we are working through
+block=$7
+
+#====================================================================
+# Specify this script's parameters
+#====================================================================
+
+#(a) Determine the subject in the filelist 
+# You sum 1 to offset the zero-based indexing
+# SLURM_ARRAY_TASK_ID=1
+subject_pos_file=$((1 + ${SLURM_ARRAY_TASK_ID} + (${block}* ${block_length}) ))
+subject=$(sed -n ${subject_pos_file}p ${sublist})
+
+#(b) location of script to submit
+scriptDir=${metaDir}/code
+
+#(c) location of log files the script being submitted
+logDir=${metaDir}/logs/run_freesurfer/${assessment}
+echo "${logDir}"
+
+#----- Checks:
+# Check if logDir does not exist and create it if necessary
+if [ ! -d "$logDir" ]; then
+  mkdir -p "$logDir"
+fi
+# logs is now just in the pre-processing file, whereas the meta logs are: /home/bp520/rds/hpc-work/Pre-Processing/code/meta_logs
+
+#(d) create output file
+outputFile="${logDir}/${subject}_run_freesurfer.log"
+echo $outputFile
+
+#====================================================================
+# Define array job
+#====================================================================
+echo "this output is from inside run_freesurfer_array.sh"  >> ${outputFile} 2>&1
+echo "My number: ${SLURM_ARRAY_TASK_ID}, Job ID: ${SLURM_JOB_ID}" >> ${outputFile} 2>&1
+echo "Running freesurfer for: " ${subject} >> ${outputFile} 2>&1
+sh ${scriptDir}/run_conditional.sh ${subject} ${dataDir} ${assessment} ${arm} >> ${outputFile} 2>&1
