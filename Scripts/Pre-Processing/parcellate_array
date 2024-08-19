@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Iterates across all subjects to transform the parcellation from standard space to native space
+# GOAL: Iterates across all subjects to transform the parcellation from standard space to native space
+
 #====================================================================
 # Read in parameters from meta-script
 #====================================================================
-
 #1. List of subjects to iterate through
 sublist=$1
 
@@ -40,7 +40,9 @@ scriptDir=${metaDir}/code
 #(c) location of log files for THIS script
 logDir=${metaDir}/logs/abcd_parcellate/${assessment}/
 
-#----- Checks:
+#====================================================================
+# Checks:
+#====================================================================
 # Check if logDir does not exist and create it if necessary
 if [ ! -d "$logDir" ]; then
   mkdir -p "$logDir"
@@ -85,7 +87,7 @@ echo "this is code running from inside abcd_parcellate_array.sh" >> ${outputFile
 	   echo "${sub} Incomplete reconstruction" >> ${outputFile} 2>&1
 	fi
 
-
+#====================================================================
 # Delete automatic log file if needed
 #====================================================================
 TEMP_log="${metaDir}/logs/Tmp"
