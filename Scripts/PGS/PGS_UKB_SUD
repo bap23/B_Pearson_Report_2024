@@ -60,3 +60,87 @@ python /home/bp520/rds/hpc-work/PGS_UKB/PRScs/PRScs.py --ref_dir=/home/bp520/rds
 # This line executes the Python script PRScs.py with specified parameters. 
 # Parameters include references to directories (--ref_dir), input files (--bim_prefix, --sst_file), numerical values (--n_gwas, --phi), and an output directory (--out_dir).
 echo "Job Finished"
+
+# -------------------------------------------------------------------#
+# Second Step:
+# -------------------------------------------------------------------#
+# Load modules: 
+# Check which plink module is available in HPC: 
+# module avail plink 
+# /usr/local/software/spack/current/share/spack/tcl/linux-rhel7-x86_64 
+# plink-1.07-gcc-5.4.0-34ob5b6  plink-1.9-gcc-5.4.0-sm3ojoi  
+# /usr/local/Cluster-Config/modulefiles
+# plink/2.00-alpha 
+
+# Load the plink2 module:
+module load plink/2.00-alpha
+
+# Check plink2 version
+plink2 --version
+
+# Set paths
+bim_prefix="/home/bp520/rds/rds-rb643-ukbiobank2/Data_Genetics/Genetic_data/Neuroimaging_samples/ukbchr_v2_r2correct_v2_"
+all_chr_dir="/home/bp520/rds/hpc-work/PGS_UKB/SUD/all_chr_dir" # output I got from Step 1 of PGS
+output_dir="/home/bp520/rds/hpc-work/PGS_UKB/SUD/individual_score"
+# Create output directory if it doesn't exist
+mkdir -p "${output_dir}"
+
+for i in {1..22}; do plink2 --bfile "$bim_prefix${i}" --score "${all_chr_dir}/SUD_pst_eff_a1_b0.5_phi1e-02_chr${i}.txt" 2 4 6 center --out "${output_dir}/SUD_chr${i}"; done
+
+# -------------------------------------------------------------------#
+# Final step to generate PGS for UKB - SUD
+# -------------------------------------------------------------------#
+# # Generates individual PGS scores per individual (based on IID)
+# # Author: Bess Pearson 
+
+# # Set working directory: 
+setwd("/home/bp520/rds/hpc-work/PGS_UKB/SUD/individual_score")
+
+# # Load modules: 
+# install.packages("data.table")
+library(data.table)
+# install.packages("dplyr")
+library(dplyr)
+# install.packages("tidyr")
+library(tidyr)
+
+# Define the directory containing the chromosome files
+directory <- "/home/bp520/rds/hpc-work/PGS_UKB/SUD/individual_score"
+
+# Get all chromosome files
+file_paths <- list.files(directory, pattern = "SUD_chr.*\\.sscore", full.names = TRUE)
+
+# Read and combine the data for each participant
+combined_data <- rbindlist(lapply(file_paths, function(file) {
+  data <- fread(file, select = c("IID", "SCORE1_AVG"))
+  chromosome <- gsub("SUD_chr|\\.sscore", "", basename(file))
+  data[, Chromosome := chromosome]
+  return(data)
+}))
+
+# Aggregate SCORE1_AVG for each participant
+aggregated_data <- combined_data[, .(SCORE1_AVG_SUM = sum(SCORE1_AVG)), by = .(IID)]
+
+# Pivot the data to have one row per IID, with SCORE1_AVG values for each chromosome
+combined_data_pivoted <- combined_data %>%
+  pivot_wider(names_from = Chromosome, values_from = SCORE1_AVG, names_prefix = "chr", values_fn = list(SCORE1_AVG = sum), values_fill = NA)
+
+# Join the pivoted data with the aggregated data
+final_data <- combined_data_pivoted %>%
+  left_join(aggregated_data, by = "IID")
+
+# Rename the aggregated score column for clarity
+final_data <- final_data %>%
+  rename(finalsummedscore = SCORE1_AVG_SUM)
+
+# Scale the summated PGS and assign it to a new column
+final_data$scaledscore <- scale(final_data$finalsummedscore, center = TRUE, scale = TRUE)
+# VARUNS SUGGESTION WITH SCALED DATA 
+
+# Create a new folder for the final scores
+final_score_directory <- "/home/bp520/rds/hpc-work/PGS_UKB/SUD/Final_Score"
+dir.create(final_score_directory, showWarnings = FALSE)
+
+# Write the final data to a file
+output_file <- file.path(final_score_directory, "Final_PGS_SUD.txt")
+write.table(final_data, file = output_file, sep = "\t", quote = FALSE, row.names = FALSE)
