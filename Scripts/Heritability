@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Note: Script to identify the heritability of each MRI-derived brain phenotype - CT, SA, and GMV - at each timepoint (T0 and T1)
 
 # Defined paths: 
