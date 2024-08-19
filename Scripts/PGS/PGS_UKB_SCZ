@@ -1,0 +1,61 @@
+#!/bin/bash
+# Script used to make PGS-SCZ for UKB dataset
+# Adapted from: PGS_ABCD_26_June_2023.sh
+# Author: Bess Pearson 
+
+#-------------------------------------------------------------------#
+. /etc/profile.d/modules.sh                # Leave this line (enables the module command)
+echo "Module command enabled."
+
+module load rhel7/default-ccl              # REQUIRED - loads the basic environment
+echo "Basic environment loaded."
+
+source $(conda info --base)/etc/profile.d/conda.sh  
+
+# -------------------------------------------------------------------#
+# # Need to download the PRScs and the ldblk_1kg_eur from:
+# # https://github.com/getian107/PRScs.git
+# # make sure you are in correct working directory (e.g. cd /home/bp520/rds/hpc-work/PGS_UKB)
+# -------------------------------------------------------------------#
+
+# git clone https://github.com/getian107/PRScs.git
+
+# wget "https://www.dropbox.com/s/t9opx2ty6ucrpib/ldblk_ukbb_eur.tar.gz?e=1&dl=0"  # downloads the ldblk_ukbb_eur
+# tar -zxvf "ldblk_ukbb_eur.tar.gz?e=1&dl=0"    # will unzip the above file
+# tar -zxvf "ldblk_ukbb_eur.tar.gz?e=1"
+
+#-------------------------------------------------------------------#
+# Still need to load the module for conda, and specific packages
+#-------------------------------------------------------------------#
+
+# conda init  # sets up the shell to recognize and use Conda's commands and environments
+# conda info --envs   # used to display a list of conda environments, I initially just had the base environment
+# conda create --name PRSenv # used to create a new conda environment, labelled "PRSenv"
+# # conda config --add channels defaults; conda config --add channels bioconda; conda config --add channels conda-forge #increases the number of packages available to install via Conda
+# # conda config --set remote_read_timeout_secs 1000
+
+# conda install --name PRSenv scipy=1.11.0   # installs specific packages, scipy 
+# # Downloaded older version (not 1.13.0 or 1.12.0, due to errors) --> https://scipy.github.io/devdocs/release/1.11.0-notes.html
+# conda install --name PRSenv h5py    # installs specific packages, h5py 
+# conda info --envs   # now showed that the PRSenv was created
+
+conda activate PRSenv   # activates the Conda environment named PRSenv, assuming it's been previously created.
+# conda list -n PRSenv    # should spit out a list of everything that is in the environment, can see the scipy and h5py are in the environment
+
+echo "Conda PRSenv Activated, Running PRScs Now."
+
+# -------------------------------------------------------------------#
+# This will run the Python directory via: git clone https://github.com/getian107/PRScs.git
+# -------------------------------------------------------------------#
+
+# # Downloaded the .zip file from here: https://figshare.com/articles/dataset/scz2022/19426775
+# # Moved to hpc
+# unzip SCZ.zip
+# gunzip *.gz 
+# head -n 75 /home/bp520/rds/hpc-work/PGS_UKB/Zip_Files/SCZ_zip/SCZ_unzipped/PGC3_SCZ_wave3.primary.autosome.public.v3.vcf.tsv
+# awk '{print $2, $4, $5, $9, $11}' PGC3_SCZ_wave3.primary.autosome.public.v3.vcf.tsv > PGS_UKB_SCZ_Trubetskoy_2022_renamed.txt
+
+python /home/bp520/rds/hpc-work/PGS_UKB/PRScs/PRScs.py --ref_dir=/home/bp520/rds/hpc-work/PGS_UKB/LD/ldblk_ukbb_eur --bim_prefix=/home/bp520/rds/rds-rb643-ukbiobank2/Data_Genetics/Genetic_data/Neuroimaging_samples/fileforclumping --sst_file=/home/bp520/rds/hpc-work/PGS_UKB/Zip_Files/SCZ_zip/PGS_UKB_SCZ_Trubetskoy_2022_.txt --n_gwas=161405 --out_dir=/home/bp520/rds/hpc-work/PGS_UKB/SCZ --phi=1e-2
+# This line executes the Python script PRScs.py with specified parameters. 
+# Parameters include references to directories (--ref_dir), input files (--bim_prefix, --sst_file), numerical values (--n_gwas, --phi), and an output directory (--out_dir).
+echo "Job Finished"
