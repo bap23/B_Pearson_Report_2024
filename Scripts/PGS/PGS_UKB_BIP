@@ -12,8 +12,6 @@ module load rhel7/default-ccl              # REQUIRED - loads the basic environm
 echo "Basic environment loaded."
 
 source $(conda info --base)/etc/profile.d/conda.sh  
-# # This line sources the conda.sh script to set up the Conda environment. 
-# # It enables you to use Conda commands and activate Conda environments.
 
 # -------------------------------------------------------------------#
 # # Need to download the PRScs and the ldblk_1kg_eur from:
