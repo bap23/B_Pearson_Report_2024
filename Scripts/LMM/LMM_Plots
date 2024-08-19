@@ -1,0 +1,85 @@
+# Final Script to visualize the linear model
+# Created on: 14/07/2024
+# Author: Bess Pearson
+# Version: 1.0
+
+# Set working directory 
+setwd("C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs")
+
+# Load required libraries
+library(ggseg)
+library(ggplot2)
+library(dplyr)
+library(extrafont)
+
+# Load system fonts
+loadfonts(device = "win")
+
+# Check if the CSV file exists
+csv_file <- "All_Phenotypes_UKB_LMM_Final.csv"
+if (!file.exists(csv_file)) {
+  stop(paste("File not found:", csv_file))
+}
+
+# Read the CSV file
+data <- read.csv(csv_file)
+
+# Ensure the correct ordering of timepoint levels
+data$Timepoint <- factor(data$Timepoint, levels = c("T0", "T1"))
+
+# Define the conditions
+conditions <- c("ADHD", "ASD", "BIP", "MDD", "SCZ", "SUD")
+
+# Define the output directory for plots
+output_dir <- "C:/Users/bess_/OneDrive/Documents/Work/MSc_Thesis/R_Script/LMM/Outputs/Plots"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+# Loop through each condition and generate plots
+for (condition in conditions) {
+  for (hemi in c("left", "right")) {
+    # Filter data for the specific condition and hemisphere
+    condition_data <- data %>%
+      filter(PGS == condition, Hemi == hemi)
+    
+    # Check if the filtered data is empty
+    if (nrow(condition_data) == 0) {
+      warning(paste("No data for condition:", condition, "and hemisphere:", hemi))
+      next
+    }
+    
+    # Combine timepoint and phenotype into a single factor with proper ordering
+    phenotypes <- unique(data$Phenotype)
+    condition_data$facet_var <- factor(paste(condition_data$Timepoint, condition_data$Phenotype),
+                                       levels = c(paste("T0", phenotypes), paste("T1", phenotypes)))
+    
+    # Create visualization
+    condition_vis <- condition_data %>%
+      ggseg(mapping = aes(fill = Estimate, col = Significant_P_Value), atlas = "dk",
+            hemisphere = hemi) +
+      scale_fill_gradient2(low = "#006EAF", mid = "white", high = "#F7B738",
+                           limits = c(-0.11, 0.11),
+                           guide = guide_colorbar(title = "Effect Size")) +
+      scale_colour_manual(values = c("not sig" = "black", "sig" = "red"),
+                          guide = guide_legend(title = "Significant")) +
+      facet_wrap(~ facet_var) +
+      theme(strip.background = element_rect(linewidth = 0),
+            text = element_text(family = "Arial", size = 12),  # Set font to Arial
+            plot.title = element_text(size = 12, family = "Arial"),
+            legend.title = element_text(size = 12, family = "Arial"),
+            legend.text = element_text(size = 10, family = "Arial")) +  # Arial for legend text
+      ggtitle(paste(condition, "-", toupper(hemi)))
+    
+    # Print the plot
+    print(condition_vis)
+    
+    # Save the plot as PNG
+    png_filename <- file.path(output_dir, paste0(condition, "_", hemi, "_plot.png"))
+    ggsave(filename = png_filename, plot = condition_vis, width = 10, height = 8, units = "in")
+    
+    # Save the plot as PDF
+    pdf_filename <- file.path(output_dir, paste0(condition, "_", hemi, "_plot.pdf"))
+    ggsave(filename = pdf_filename, plot = condition_vis, width = 10, height = 8, units = "in")
+  }
+}
